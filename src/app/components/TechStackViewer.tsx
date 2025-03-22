@@ -20,6 +20,7 @@ interface TechStackViewerProps {
 export default function TechStackViewer({ dependencies, onBack }: TechStackViewerProps) {
   const [selectedDep, setSelectedDep] = useState<Dependency | null>(null);
   const [groupedDeps, setGroupedDeps] = useState<Record<string, Dependency[]>>({});
+  const [imageLoadState, setImageLoadState] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     // Group dependencies by type
@@ -33,11 +34,37 @@ export default function TechStackViewer({ dependencies, onBack }: TechStackViewe
     setGroupedDeps(grouped);
   }, [dependencies]);
 
+  // Track image load states
+  useEffect(() => {
+    const newImageState: Record<string, boolean> = {};
+    dependencies.forEach(dep => {
+      newImageState[dep.name] = false;
+    });
+    setImageLoadState(newImageState);
+  }, [dependencies]);
+
   const dependencyTypes = {
     'dependencies': 'Production Dependencies',
     'devDependencies': 'Development Dependencies',
     'peerDependencies': 'Peer Dependencies',
     'optionalDependencies': 'Optional Dependencies'
+  };
+
+  const handleImageLoad = (depName: string) => {
+    setImageLoadState(prev => ({
+      ...prev,
+      [depName]: true
+    }));
+  };
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, depName: string) => {
+    const imgElement = e.target as HTMLImageElement;
+    imgElement.onerror = null;
+    imgElement.src = 'https://raw.githubusercontent.com/npm/logos/master/npm%20logo/npm-logo-red.png';
+    setImageLoadState(prev => ({
+      ...prev,
+      [depName]: true
+    }));
   };
 
   return (
@@ -69,15 +96,18 @@ export default function TechStackViewer({ dependencies, onBack }: TechStackViewe
                   className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex flex-col items-center justify-center hover:bg-gray-700 transition-all cursor-pointer"
                   onClick={() => setSelectedDep(dep)}
                 >
-                  <div className="w-16 h-16 flex items-center justify-center mb-2 bg-gray-900 rounded-full p-2">
+                  <div className="w-16 h-16 flex items-center justify-center mb-2 bg-gray-900 rounded-full p-2 relative">
+                    {!imageLoadState[dep.name] && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-gray-600 border-t-blue-400 rounded-full animate-spin"></div>
+                      </div>
+                    )}
                     <img
                       src={dep.logoUrl || 'https://raw.githubusercontent.com/npm/logos/master/npm%20logo/npm-logo-red.png'}
                       alt={`${dep.name} logo`}
-                      className="max-w-full max-h-full object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).onerror = null;
-                        (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/npm/logos/master/npm%20logo/npm-logo-red.png';
-                      }}
+                      className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imageLoadState[dep.name] ? 'opacity-100' : 'opacity-0'}`}
+                      onLoad={() => handleImageLoad(dep.name)}
+                      onError={(e) => handleImageError(e, dep.name)}
                     />
                   </div>
                   <div className="text-center">

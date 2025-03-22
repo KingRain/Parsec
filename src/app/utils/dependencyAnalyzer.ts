@@ -10,6 +10,15 @@ interface Dependency {
   llmDescription?: string;
 }
 
+// Define a type for package.json structure
+interface PackageJson {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 /**
  * Attempts to find and fetch package.json from a repository
  * First checks root, then searches for it if not found
@@ -147,9 +156,10 @@ export const searchForFile = async (repoOwner: string, repoName: string, fileNam
 };
 
 /**
- * Extracts dependencies from package.json
+ * Create a basic dependency object with just name, version and type
+ * This provides the bare minimum for rendering immediately
  */
-export const extractDependencies = (packageJson: any): Dependency[] => {
+export const createInitialDependencies = (packageJson: PackageJson): Dependency[] => {
   if (!packageJson) return [];
   
   const deps: Dependency[] = [];
@@ -164,11 +174,14 @@ export const extractDependencies = (packageJson: any): Dependency[] => {
   
   dependencyTypes.forEach(type => {
     if (packageJson[type]) {
-      Object.entries(packageJson[type]).forEach(([name, version]) => {
+      Object.entries(packageJson[type] as Record<string, string>).forEach(([name, version]) => {
         deps.push({
           name,
-          version: version as string,
-          type
+          version,
+          type,
+          // Add placeholder for immediate rendering
+          description: '',
+          logoUrl: `https://img.shields.io/npm/v/${name}.svg`
         });
       });
     }
@@ -178,20 +191,28 @@ export const extractDependencies = (packageJson: any): Dependency[] => {
 };
 
 /**
- * Fetches package metadata including logos for each dependency
+ * Extracts dependencies from package.json
+ */
+export const extractDependencies = (packageJson: PackageJson): Dependency[] => {
+  return createInitialDependencies(packageJson);
+};
+
+/**
+ * Fetches package metadata including descriptions (but not logos)
+ * Returns text data for immediate rendering
  */
 export const fetchPackageMetadata = async (dependencies: Dependency[]): Promise<Dependency[]> => {
   const enrichedDependencies = [...dependencies];
   
-  // Process in parallel with a limit of 5 concurrent requests
-  const concurrentLimit = 5;
+  // Process in parallel with a limit of 8 concurrent requests for faster processing
+  const concurrentLimit = 8;
   for (let i = 0; i < dependencies.length; i += concurrentLimit) {
     const batch = dependencies.slice(i, i + concurrentLimit);
     const promises = batch.map(async (dep) => {
       try {
-        // Set up timeout
+        // Set up timeout - shorter timeout for faster response
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
         
         // Try to get npm metadata
         const npmResponse = await fetch(`https://registry.npmjs.org/${dep.name}`, {
@@ -203,12 +224,11 @@ export const fetchPackageMetadata = async (dependencies: Dependency[]): Promise<
         if (npmResponse.ok) {
           const npmData = await npmResponse.json();
           
+          // Return text data only, leave the logo as is
           return {
             ...dep,
             description: npmData.description || '',
-            homepage: npmData.homepage || (npmData.repository?.url ? npmData.repository.url.replace('git+', '').replace('.git', '') : ''),
-            // Limit logo fetching time
-            logoUrl: await findPackageLogo(dep.name)
+            homepage: npmData.homepage || (npmData.repository?.url ? npmData.repository.url.replace('git+', '').replace('.git', '') : '')
           };
         }
         return dep;
@@ -232,6 +252,48 @@ export const fetchPackageMetadata = async (dependencies: Dependency[]): Promise<
 };
 
 /**
+ * Loads logos for dependencies after initial rendering
+ * This is done separately to ensure UI is responsive first
+ */
+export const loadLogosForDependencies = async (dependencies: Dependency[], updateCallback: (deps: Dependency[]) => void): Promise<void> => {
+  // Don't start loading logos immediately - use a small delay to ensure the UI is responsive first
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Create a copy to avoid mutating the original array
+  const updatedDeps = [...dependencies];
+  
+  // Load logos in smaller batches for better performance
+  const batchSize = 2;
+  for (let i = 0; i < dependencies.length; i += batchSize) {
+    const batch = dependencies.slice(i, i + batchSize);
+    
+    // Load logos in parallel for this batch
+    await Promise.all(batch.map(async (dep, batchIndex) => {
+      try {
+        const logoUrl = await findPackageLogo(dep.name);
+        const index = i + batchIndex;
+        
+        // Update the dependency with its logo
+        if (index < updatedDeps.length) {
+          updatedDeps[index] = {
+            ...updatedDeps[index],
+            logoUrl
+          };
+          
+          // Call the callback after each logo is loaded to update the UI
+          updateCallback([...updatedDeps]);
+        }
+      } catch (error) {
+        console.error(`Failed to load logo for ${dep.name}:`, error);
+      }
+    }));
+    
+    // Small delay between batches to prevent UI freezing
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+};
+
+/**
  * Attempts to find a logo for a package from various sources
  */
 export const findPackageLogo = async (packageName: string): Promise<string> => {
@@ -241,17 +303,17 @@ export const findPackageLogo = async (packageName: string): Promise<string> => {
     .replace(/\//g, '-')
     .toLowerCase();
   
-  // Various logo providers to try
+  // Various logo providers to try - prioritize faster sources
   const logoProviders = [
-    `https://cdn.jsdelivr.net/npm/${packageName}/logo.png`,
-    `https://unpkg.com/${packageName}/logo.png`,
+    `https://img.shields.io/npm/v/${packageName}.svg`, // Start with the fastest source
     `https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/${simplifiedName}.svg`,
-    `https://img.shields.io/npm/v/${packageName}.svg`
+    `https://cdn.jsdelivr.net/npm/${packageName}/logo.png`,
+    `https://unpkg.com/${packageName}/logo.png`
   ];
   
-  // Set up timeout for logo fetching
+  // Set up timeout for logo fetching - shorter timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
   
   try {
     // Try each provider with a short timeout
