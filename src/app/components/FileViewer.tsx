@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { getGitHubFetchOptions } from '../utils/githubAuth';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface FileViewerProps {
     repoOwner: string;
@@ -49,6 +51,40 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
             yaml: '⚙️',
         };
         return iconMap[extension || ''] || '📄';
+    };
+
+    const getLanguageFromFileType = (fileType: string): string => {
+        const languageMap: { [key: string]: string } = {
+            js: 'javascript',
+            jsx: 'jsx',
+            ts: 'typescript',
+            tsx: 'tsx',
+            py: 'python',
+            java: 'java',
+            html: 'html',
+            css: 'css',
+            json: 'json',
+            md: 'markdown',
+            yml: 'yaml',
+            yaml: 'yaml',
+            cpp: 'cpp',
+            c: 'c',
+            cs: 'csharp',
+            go: 'go',
+            rs: 'rust',
+            rb: 'ruby',
+            php: 'php',
+            sql: 'sql',
+            sh: 'bash',
+            bash: 'bash',
+            xml: 'xml',
+            swift: 'swift',
+            kt: 'kotlin',
+            scala: 'scala',
+            r: 'r',
+            dart: 'dart',
+        };
+        return languageMap[fileType] || 'text';
     };
 
     const fetchDirectoryContents = async (path: string) => {
@@ -234,11 +270,11 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
                         </div>
                     ) : (
-                        <div className="py-2">
+                        <div className="py-0">
                             {files.map((file, index) => (
                                 <div
                                     key={index}
-                                    className="flex items-center px-4 py-2 hover:bg-gray-900 cursor-pointer transition-colors duration-150 ease-in-out"
+                                    className="flex items-center py-1 hover:bg-gray-900 cursor-pointer transition-colors duration-150 ease-in-out"
                                     onClick={() => handleFileClick(file)}
                                 >
                                     <div className="flex items-center gap-2" style={{ paddingLeft: `${currentPath.length * 12}px` }}>
@@ -279,8 +315,8 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
             </div>
 
             <div className="flex-1 flex flex-col">
-                <div className="p-4 border-b border-gray-800 bg-black">
-                    <div className="flex items-center gap-2">
+                <div className="p-4 border-b border-gray-800 bg-black overflow-x-auto">
+                    <div className="flex items-center gap-2 whitespace-nowrap">
                         {currentPath.map((segment, index) => (
                             <span key={index} className="flex items-center">
                                 {index > 0 && <span className="text-gray-500 mx-1">/</span>}
@@ -295,16 +331,17 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 bg-black">
-                    {loading ? (
-                        <div className="flex justify-center items-center py-12">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
-                        </div>
-                    ) : fileContent ? (
-                        <div className="bg-black rounded-lg p-4 h-full">
-                            <pre className="font-mono text-sm text-gray-200 whitespace-pre-wrap overflow-x-auto p-4 rounded">{fileContent}</pre>
-                        </div>
-                    ) : null}
+                <div className="flex-1 overflow-y-auto overflow-x-auto p-4 bg-black">
+                    {fileContent && (
+                        <SyntaxHighlighter
+                            language={getLanguageFromFileType(currentFileType)}
+                            style={vscDarkPlus}
+                            className="rounded-lg"
+                            wrapLongLines={false}
+                        >
+                            {fileContent}
+                        </SyntaxHighlighter>
+                    )}
                 </div>
             </div>
         </div>

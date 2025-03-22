@@ -1,6 +1,7 @@
 "use client";
 
 import FileViewer from '@/app/components/FileViewer';
+import DetailsBrowser from '@/app/components/DetailsBrowser';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function ProjectPage() {
@@ -21,11 +22,19 @@ export default function ProjectPage() {
             >
                 {projectName}
             </h1>
-            <div className="w-1/2">
-                <FileViewer
-                    repoOwner={username}
-                    repoName={projectName}
-                />
+            <div className="flex">
+                <div className="w-3/4">
+                    <FileViewer
+                        repoOwner={username}
+                        repoName={projectName}
+                    />
+                </div>
+                <div className="w-1/4">
+                    <DetailsBrowser
+                        repoOwner={username}
+                        repoName={projectName}
+                    />
+                </div>
             </div>
         </main>
     );
