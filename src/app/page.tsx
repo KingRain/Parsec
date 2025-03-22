@@ -1,5 +1,8 @@
 "use client";
 
+import { InteractiveHoverButton } from "./components/magicui/interactive-hover-button";
+import { GlobeEffect } from "./components/GlobeEffect";
+
 export default function Home() {
     const handleLogin = () => {
         const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -17,13 +20,19 @@ export default function Home() {
     };
 
     return (
-        <main className="flex justify-center items-center h-screen">
-            <button
-                onClick={handleLogin}
-                className="px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition"
-            >
-                Login with GitHub
-            </button>
+        <main className="flex flex-col h-screen overflow-hidden">
+            <GlobeEffect />
+            
+            <div className="absolute top-[60%] mt-40 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 w-full max-w-md px-8">
+                <div className="flex justify-center mt-8">
+                    <InteractiveHoverButton
+                        onClick={handleLogin}
+                        className="w-full max-w-xs"
+                    >
+                        Sign in with GitHub
+                    </InteractiveHoverButton>
+                </div>
+            </div>
         </main>
     );
 }
