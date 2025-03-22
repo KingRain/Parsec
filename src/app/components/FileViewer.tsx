@@ -5,7 +5,8 @@ import TechStackViewer from './TechStackViewer';
 import { 
   detectAndFetchPackageJson, 
   extractDependencies, 
-  fetchPackageMetadata, 
+  fetchPackageMetadata,
+  loadLogosForDependencies,
   fetchLLMDescriptions 
 } from '../utils/dependencyAnalyzer';
 import { getGitHubFetchOptions } from '../utils/githubAuth';
@@ -143,45 +144,52 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                 return;
             }
             
-            // Step 2: Extract dependencies
-            const extractedDeps = extractDependencies(packageData);
+            // Step 2: Extract dependencies with basic data for immediate display
+            const basicDeps = extractDependencies(packageData);
             
-            if (extractedDeps.length === 0) {
+            if (basicDeps.length === 0) {
                 alert('No dependencies found in package.json');
                 setLoadingTechStack(false);
                 return;
             }
             
-            // Step 3: Fetch logos and metadata (with 20 second timeout)
-            const metadataPromise = fetchPackageMetadata(extractedDeps);
-            const timeoutMetadata = new Promise<never>((_, reject) => 
-                setTimeout(() => reject(new Error('Metadata fetch timed out')), 20000)
-            );
-            
-            let depsWithMetadata: Dependency[] = extractedDeps;
-            try {
-                depsWithMetadata = await Promise.race([metadataPromise, timeoutMetadata]);
-            } catch (err) {
-                console.error('Error fetching metadata:', err);
-                // Continue with basic dependency information if metadata fetch fails
-            }
-            
-            // Step 4: Get LLM descriptions (with 15 second timeout)
-            let enrichedDeps: Dependency[] = depsWithMetadata;
-            try {
-                const descriptionPromise = fetchLLMDescriptions(depsWithMetadata);
-                const timeoutDescription = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error('Description fetch timed out')), 15000)
-                );
-                
-                enrichedDeps = await Promise.race([descriptionPromise, timeoutDescription]);
-            } catch (err) {
-                console.error('Error fetching descriptions:', err);
-                // Continue without descriptions if that part fails
-            }
-            
-            setDependencies(enrichedDeps);
+            // Immediately show the basic dependencies with placeholder logos
+            setDependencies(basicDeps);
             setShowTechStack(true);
+            setLoadingTechStack(false);
+            
+            // Enhancement 1: Fetch metadata in background to add descriptions
+            fetchPackageMetadata(basicDeps)
+                .then(depsWithMetadata => {
+                    setDependencies(depsWithMetadata);
+                    
+                    // Enhancement 2: Fetch LLM descriptions after metadata
+                    fetchLLMDescriptions(depsWithMetadata)
+                        .then(enrichedDeps => {
+                            setDependencies(enrichedDeps);
+                            
+                            // Enhancement 3: Load logos last, after everything else is done
+                            loadLogosForDependencies(enrichedDeps, updatedDeps => {
+                                setDependencies([...updatedDeps]);
+                            });
+                        })
+                        .catch(error => {
+                            console.error('Error fetching descriptions:', error);
+                            
+                            // Still try to load logos even if descriptions failed
+                            loadLogosForDependencies(depsWithMetadata, updatedDeps => {
+                                setDependencies([...updatedDeps]);
+                            });
+                        });
+                })
+                .catch(error => {
+                    console.error('Error fetching metadata:', error);
+                    
+                    // Try to load logos even if metadata failed
+                    loadLogosForDependencies(basicDeps, updatedDeps => {
+                        setDependencies([...updatedDeps]);
+                    });
+                });
         } catch (error) {
             console.error('Failed to analyze tech stack:', error);
             
@@ -191,7 +199,6 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
             } else {
                 alert('Failed to analyze tech stack. Please try again or try another repository.');
             }
-        } finally {
             setLoadingTechStack(false);
         }
     };
