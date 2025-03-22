@@ -19,6 +19,12 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     const [files, setFiles] = useState<FileItem[]>([]);
     const [fileContent, setFileContent] = useState<string>('');
     const [loading, setLoading] = useState(false);
+    const [generatingDiagram, setGeneratingDiagram] = useState(false);
+    const [mermaidDiagram, setMermaidDiagram] = useState<string>('');
+    const [showDiagram, setShowDiagram] = useState(false);
+    const [diagramError, setDiagramError] = useState<string | null>(null);
+    const [currentFileName, setCurrentFileName] = useState<string>('');
+    const [currentFileType, setCurrentFileType] = useState<string>('');
 
     useEffect(() => {
         if (repoOwner && repoName) {
@@ -85,6 +91,15 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                 return;
             }
             
+            const fileName = path.split('/').pop() || '';
+            const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+            setCurrentFileName(fileName);
+            setCurrentFileType(fileExtension);
+            
+            setMermaidDiagram('');
+            setShowDiagram(false);
+            setDiagramError(null);
+            
             if (fileData.encoding === 'base64') {
                 const content = atob(fileData.content.replace(/\n/g, ''));
                 setFileContent(content);
@@ -120,6 +135,96 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
         setFileContent('');
     };
 
+    const generateDiagram = async () => {
+        if (!fileContent || generatingDiagram) return;
+        
+        setGeneratingDiagram(true);
+        setDiagramError(null);
+        
+        try {
+            const response = await fetch('/api/generate-diagram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileContent,
+                    fileName: currentFileName,
+                    fileType: currentFileType
+                }),
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate diagram');
+            }
+            
+            const data = await response.json();
+            
+            if (data.fallback) {
+                console.log('Using fallback diagram due to generation issues');
+            }
+            
+            setMermaidDiagram(data.diagram);
+            setShowDiagram(true);
+            
+            const diagramWindow = window.open('', '_blank');
+            if (diagramWindow) {
+                diagramWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Code Visualization: ${currentFileName}</title>
+                        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+                        <style>
+                            body { 
+                                font-family: system-ui, sans-serif; 
+                                background: #1e1e1e; 
+                                color: #fff;
+                                padding: 20px;
+                            }
+                            .mermaid {
+                                display: flex;
+                                justify-content: center;
+                                background: #2d2d2d;
+                                padding: 20px;
+                                border-radius: 8px;
+                                margin-top: 20px;
+                            }
+                            h1 {
+                                font-size: 1.5rem;
+                                margin-bottom: 20px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Code Visualization: ${currentFileName}</h1>
+                        <div class="mermaid">
+                            ${data.diagram}
+                        </div>
+                        <script>
+                            mermaid.initialize({
+                                startOnLoad: true,
+                                theme: 'dark',
+                                logLevel: 'error',
+                                securityLevel: 'loose',
+                                fontFamily: 'monospace'
+                            });
+                        </script>
+                    </body>
+                    </html>
+                `);
+                diagramWindow.document.close();
+            }
+        } catch (error) {
+            console.error('Error generating diagram:', error);
+            setDiagramError(error instanceof Error ? error.message : String(error));
+            alert('Failed to generate diagram: ' + (error instanceof Error ? error.message : String(error)));
+        } finally {
+            setGeneratingDiagram(false);
+        }
+    };
+
     return (
         <div className="flex h-screen bg-black text-gray-100">
             <div className="w-64 border-r border-gray-800 overflow-y-auto bg-black">
@@ -147,6 +252,30 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                         </div>
                     )}
                 </div>
+                
+                {fileContent && (
+                    <div className="px-3 py-3 border-t border-gray-800">
+                        <button
+                            className="px-3 py-2 w-full bg-purple-700 hover:bg-purple-600 text-white rounded flex items-center justify-center gap-2 transition-colors"
+                            onClick={generateDiagram}
+                            disabled={generatingDiagram}
+                        >
+                            {generatingDiagram ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <span>Generating...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    <span>Visualize Code</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 flex flex-col">
