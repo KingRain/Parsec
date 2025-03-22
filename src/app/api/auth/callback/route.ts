@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
         console.log("✅ Successfully received access token");
         
-        cookies().set("github_token", response.data.access_token, {
+        (await cookies()).set("github_token", response.data.access_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
