@@ -1,0 +1,12 @@
+graph TD
+    User[User] -->|Inputs GitHub URL/Code| Frontend[Frontend Web App]
+    Frontend -->|API Request| Backend[Backend Server]
+    Backend -->|Clone/Fetch Repo| GitHub[GitHub API]
+    Backend -->|Generate Diagrams| MermaidEngine[Mermaid Rendering Engine]
+    Backend -->|Analyze Code| LLM1[Primary LLM Instance]
+    Backend -->|Store Analysis| DB[Database/Cache]
+    Frontend -->|Query Specific Files| Backend
+    User -->|Ask Questions| Frontend
+    Frontend -->|Process Questions| LLM2[Secondary LLM Instance]
+    LLM2 -->|Access Cached Analysis| DB
+    MermaidEngine -->|Return Diagrams| Frontend
