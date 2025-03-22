@@ -16,7 +16,7 @@ export const fetchRepoFiles = async (
     
     try {
         const response = await fetch(
-            `https://api.github.com/repos/Kingrain/${repoName}/contents/${path}`,
+            `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`,
             getGitHubFetchOptions()
         );
 

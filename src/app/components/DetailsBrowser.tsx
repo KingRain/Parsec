@@ -170,7 +170,7 @@ export default function DetailsBrowser({
         >
           {/* Graph Content */}
           <div className="w-full h-full">
-            <WebsiteGraph userName={repoOwner} repoName={repoName}/>
+            <WebsiteGraph repoOwner={repoOwner} repoName={repoName}/>
           </div>
         </div>
       </div>

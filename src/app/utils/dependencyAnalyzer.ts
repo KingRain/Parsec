@@ -77,16 +77,21 @@ export const detectAndFetchPackageJson = async (repoOwner: string, repoName: str
     }
     
     console.log(`No package.json found in ${repoOwner}/${repoName}`);
-    return null;
+    throw new Error('No package.json found in the repository. Please ensure the repository contains a package.json file.');
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') {
       console.error(`Fetching package.json timed out for ${repoOwner}/${repoName}`);
+      throw new Error(`Timeout while searching for package.json in ${repoOwner}/${repoName}`);
     } else {
       console.error(`Failed to fetch package.json for ${repoOwner}/${repoName}:`, error);
+      // Re-throw the error so it can be handled by the caller
+      throw error instanceof Error 
+        ? error 
+        : new Error(`Failed to fetch package.json for ${repoOwner}/${repoName}`);
     }
-    return null;
   }
 };
+
 
 /**
  * Helper function to recursively search for a file in a GitHub repository
