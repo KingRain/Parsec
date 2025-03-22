@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import TechStackViewer from './TechStackViewer';
+import MermaidRenderer from './MermaidRenderer';
 import { 
   detectAndFetchPackageJson, 
   extractDependencies, 
@@ -41,6 +42,14 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     const [showTechStack, setShowTechStack] = useState(false);
     const [loadingTechStack, setLoadingTechStack] = useState(false);
     const [darkMode, setDarkMode] = useState(true);
+    
+    // New state for diagram generation
+    const [currentFileName, setCurrentFileName] = useState<string>('');
+    const [currentFileType, setCurrentFileType] = useState<string>('');
+    const [mermaidDiagram, setMermaidDiagram] = useState<string>('');
+    const [showDiagram, setShowDiagram] = useState(false);
+    const [generatingDiagram, setGeneratingDiagram] = useState(false);
+    const [diagramError, setDiagramError] = useState<string | null>(null);
 
     // Fetch repository contents immediately when component mounts
     useEffect(() => {
@@ -70,7 +79,7 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
         }
     };
 
-    const fetchFileContent = async (path: string) => {
+    const fetchFileContent = async (path: string, fileName: string) => {
         setLoading(true);
         try {
             const response = await fetch(
@@ -88,6 +97,16 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                 alert('File is too large to display (>1MB)');
                 return;
             }
+            
+            // Get file extension for determining file type
+            const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+            setCurrentFileName(fileName);
+            setCurrentFileType(fileExtension);
+            
+            // Reset diagram state when loading a new file
+            setMermaidDiagram('');
+            setShowDiagram(false);
+            setDiagramError(null);
             
             if (fileData.encoding === 'base64') {
                 const content = atob(fileData.content.replace(/\n/g, ''));
@@ -112,8 +131,10 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
             setCurrentPath([...currentPath, file.name]);
             fetchDirectoryContents(file.path);
             setFileContent('');
+            setCurrentFileName('');
+            setCurrentFileType('');
         } else {
-            fetchFileContent(file.path);
+            fetchFileContent(file.path, file.name);
         }
     };
 
@@ -203,6 +224,42 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
         }
     };
 
+    // New function to generate Mermaid diagrams
+    const generateDiagram = async () => {
+        if (!fileContent || generatingDiagram) return;
+        
+        setGeneratingDiagram(true);
+        setDiagramError(null);
+        
+        try {
+            const response = await fetch('/api/generate-diagram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileContent,
+                    fileName: currentFileName,
+                    fileType: currentFileType
+                }),
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate diagram');
+            }
+            
+            const data = await response.json();
+            setMermaidDiagram(data.diagram);
+            setShowDiagram(true);
+        } catch (error) {
+            console.error('Error generating diagram:', error);
+            setDiagramError(error instanceof Error ? error.message : String(error));
+        } finally {
+            setGeneratingDiagram(false);
+        }
+    };
+
     return (
         <div className={`mt-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black'}`}>
             {/* Top Bar with Theme Toggle and Tech Stack Analysis Button */}
@@ -223,32 +280,60 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                     )}
                 </button>
 
-                <button
-                    className={`px-4 py-2 rounded flex items-center gap-2 ${
-                        darkMode 
-                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                            : 'bg-blue-500 text-white hover:bg-blue-600'
-                    } transition-colors`}
-                    onClick={analyzeTechStack}
-                    disabled={loadingTechStack}
-                >
-                    {loadingTechStack ? (
-                        <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Analyzing...
-                        </>
-                    ) : (
-                        <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                            Analyze Tech Stack
-                        </>
+                <div className="flex gap-2">
+                    {fileContent && !showTechStack && (
+                        <button
+                            className={`px-4 py-2 rounded flex items-center gap-2 ${
+                                darkMode 
+                                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                                    : 'bg-purple-500 text-white hover:bg-purple-600'
+                            } transition-colors`}
+                            onClick={generateDiagram}
+                            disabled={generatingDiagram}
+                        >
+                            {generatingDiagram ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    Generating...
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    Visualize Code
+                                </>
+                            )}
+                        </button>
                     )}
-                </button>
+
+                    <button
+                        className={`px-4 py-2 rounded flex items-center gap-2 ${
+                            darkMode 
+                                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                        } transition-colors`}
+                        onClick={analyzeTechStack}
+                        disabled={loadingTechStack}
+                    >
+                        {loadingTechStack ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Analyzing...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                Analyze Tech Stack
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
 
-            {/* Show either tech stack analysis or file browser */}
+            {/* Main content */}
             {showTechStack ? (
                 <TechStackViewer 
                     dependencies={dependencies} 
@@ -256,59 +341,134 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                 />
             ) : (
                 <>
-                    {/* Breadcrumb Navigation */}
-                    <div className={`flex items-center gap-2 p-2 rounded mb-4 ${
-                        darkMode ? 'bg-gray-800' : 'bg-gray-100'
-                    }`}>
-                        <span 
-                            className={`cursor-pointer hover:underline ${
-                                darkMode ? 'text-blue-400' : 'text-blue-600'
-                            }`}
-                            onClick={() => {
-                                setCurrentPath([]);
-                                fetchDirectoryContents('');
-                                setFileContent('');
-                            }}
-                        >
-                            {repoName}
-                        </span>
-                        {currentPath.map((segment, index) => (
-                            <span key={index}>
-                                <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
-                                    /
-                                </span>
-                                <span 
-                                    className={`cursor-pointer hover:underline ml-1 ${
-                                        darkMode ? 'text-blue-400' : 'text-blue-600'
-                                    }`}
-                                    onClick={() => navigateToPath(index)}
-                                >
-                                    {segment}
-                                </span>
-                            </span>
-                        ))}
-                    </div>
-
                     {loading ? (
-                        <div className="flex justify-center items-center py-4">
-                            <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
-                                darkMode ? 'border-white' : 'border-gray-900'
-                            }`}></div>
+                        <div className="flex justify-center items-center py-12">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 gap-4">
-                            {/* File List */}
-                            {!fileContent && (
-                                <div className={`border rounded-lg overflow-hidden ${
-                                    darkMode ? 'border-gray-700' : ''
-                                }`}>
+                        <div>
+                            {/* Breadcrumb navigation */}
+                            <div className={`flex items-center mb-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                <span 
+                                    className={`cursor-pointer hover:underline ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}
+                                    onClick={() => {
+                                        setCurrentPath([]);
+                                        fetchDirectoryContents('');
+                                        setFileContent('');
+                                        setCurrentFileName('');
+                                        setCurrentFileType('');
+                                    }}
+                                >
+                                    {repoName}
+                                </span>
+                                
+                                {currentPath.map((segment, index) => (
+                                    <span key={index} className="flex items-center">
+                                        <span className="mx-2">/</span>
+                                        <span 
+                                            className={`cursor-pointer hover:underline ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}
+                                            onClick={() => navigateToPath(index)}
+                                        >
+                                            {segment}
+                                        </span>
+                                    </span>
+                                ))}
+                            </div>
+                            
+                            {/* Show file list or file content */}
+                            {fileContent ? (
+                                <div>
+                                    {showDiagram ? (
+                                        <div className={`border rounded-lg p-4 ${
+                                            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'
+                                        }`}>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="text-lg font-semibold">
+                                                    Code Visualization: {currentFileName}
+                                                </h3>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        className={`px-3 py-1 text-sm rounded ${
+                                                            darkMode 
+                                                                ? 'bg-gray-700 text-blue-400 hover:bg-gray-600' 
+                                                                : 'bg-gray-200 text-blue-600 hover:bg-gray-300'
+                                                        }`}
+                                                        onClick={() => setShowDiagram(false)}
+                                                    >
+                                                        Show Code
+                                                    </button>
+                                                    <button
+                                                        className={`px-3 py-1 text-sm rounded ${
+                                                            darkMode 
+                                                                ? 'bg-gray-700 text-purple-400 hover:bg-gray-600' 
+                                                                : 'bg-gray-200 text-purple-600 hover:bg-gray-300'
+                                                        }`}
+                                                        onClick={generateDiagram}
+                                                        disabled={generatingDiagram}
+                                                    >
+                                                        Regenerate
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            {diagramError ? (
+                                                <div className={`p-4 rounded-lg border ${darkMode ? 'bg-red-900/20 border-red-800 text-red-200' : 'bg-red-50 border-red-200 text-red-600'}`}>
+                                                    <p>Failed to generate diagram: {diagramError}</p>
+                                                </div>
+                                            ) : (
+                                                <MermaidRenderer 
+                                                    diagram={mermaidDiagram} 
+                                                    darkMode={darkMode} 
+                                                />
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className={`border rounded-lg p-4 ${
+                                            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'
+                                        }`}>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="text-lg font-semibold">
+                                                    {currentFileName}
+                                                </h3>
+                                                {mermaidDiagram && (
+                                                    <button
+                                                        className={`px-3 py-1 text-sm rounded ${
+                                                            darkMode 
+                                                                ? 'bg-gray-700 text-purple-400 hover:bg-gray-600' 
+                                                                : 'bg-gray-200 text-purple-600 hover:bg-gray-300'
+                                                        }`}
+                                                        onClick={() => setShowDiagram(true)}
+                                                    >
+                                                        Show Diagram
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="mb-4">
+                                                <button
+                                                    className={`hover:underline flex items-center gap-2 ${
+                                                        darkMode ? 'text-blue-400' : 'text-blue-600'
+                                                    }`}
+                                                    onClick={() => setFileContent('')}
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                                    </svg>
+                                                    Back to files
+                                                </button>
+                                            </div>
+                                            <pre className="whitespace-pre-wrap font-mono text-sm">{fileContent}</pre>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
                                     {files.map((file, index) => (
                                         <div
                                             key={index}
-                                            className={`p-3 border-b last:border-b-0 cursor-pointer flex items-center gap-2 ${
+                                            className={`flex items-center gap-2 p-2 cursor-pointer rounded ${
                                                 darkMode 
-                                                    ? 'border-gray-700 hover:bg-gray-800' 
-                                                    : 'hover:bg-gray-50'
+                                                    ? 'hover:bg-gray-800' 
+                                                    : 'hover:bg-gray-100'
                                             }`}
                                             onClick={() => handleFileClick(file)}
                                         >
@@ -328,28 +488,6 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                                             <span>{file.name}</span>
                                         </div>
                                     ))}
-                                </div>
-                            )}
-
-                            {/* File Content */}
-                            {fileContent && (
-                                <div className={`border rounded-lg p-4 ${
-                                    darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'
-                                }`}>
-                                    <div className="mb-4">
-                                        <button
-                                            className={`hover:underline flex items-center gap-2 ${
-                                                darkMode ? 'text-blue-400' : 'text-blue-600'
-                                            }`}
-                                            onClick={() => setFileContent('')}
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                            </svg>
-                                            Back to files
-                                        </button>
-                                    </div>
-                                    <pre className="whitespace-pre-wrap font-mono text-sm">{fileContent}</pre>
                                 </div>
                             )}
                         </div>

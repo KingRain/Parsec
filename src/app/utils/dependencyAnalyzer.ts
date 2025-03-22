@@ -114,6 +114,7 @@ export const searchForFile = async (repoOwner: string, repoName: string, fileNam
     
     clearTimeout(timeoutId);
     
+    
     if (response.ok) {
       const items = await response.json();
       
