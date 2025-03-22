@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import LanguageStats from "./LanguageStats";
+import WebsiteGraph from "./WebsiteGraph";
 
 interface DetailsBrowserProps {
   repoOwner: string;
@@ -168,7 +169,9 @@ export default function DetailsBrowser({
           )}
         >
           {/* Graph Content */}
-          <div className="w-full h-full">Graph Content</div>
+          <div className="w-full h-full">
+            <WebsiteGraph userName={repoOwner} repoName={repoName}/>
+          </div>
         </div>
       </div>
     </div>
