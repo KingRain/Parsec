@@ -21,10 +21,12 @@ export default function ProjectPage() {
             >
                 {projectName}
             </h1>
-            <FileViewer
-                repoOwner={username}
-                repoName={projectName}
-            />
+            <div className="w-1/2">
+                <FileViewer
+                    repoOwner={username}
+                    repoName={projectName}
+                />
+            </div>
         </main>
     );
 }
