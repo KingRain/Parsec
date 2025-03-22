@@ -23,16 +23,6 @@ interface FileItem {
     path: string;
 }
 
-interface Dependency {
-  name: string;
-  version: string;
-  type: string;
-  description?: string;
-  homepage?: string;
-  logoUrl?: string;
-  llmDescription?: string;
-}
-
 export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     const [currentPath, setCurrentPath] = useState<string[]>([]);
     const [files, setFiles] = useState<FileItem[]>([]);
@@ -57,6 +47,26 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
             fetchDirectoryContents('');
         }
     }, [repoOwner, repoName]);
+
+    const getFileIcon = (fileName: string) => {
+        const extension = fileName.split('.').pop()?.toLowerCase();
+        const iconMap: { [key: string]: string } = {
+            js: '📄',
+            jsx: '⚛️',
+            ts: '📘',
+            tsx: '⚛️',
+            py: '🐍',
+            java: '☕',
+            html: '🌐',
+            css: '🎨',
+            json: '📦',
+            md: '📝',
+            yml: '⚙️',
+            yaml: '⚙️',
+            // Add more file types as needed
+        };
+        return iconMap[extension || ''] || '📄';
+    };
 
     const fetchDirectoryContents = async (path: string) => {
         setLoading(true);
@@ -261,11 +271,9 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     };
 
     return (
-        <div className="mt-4 flex h-[calc(100vh-8rem)] bg-gray-900 text-gray-100">
+        <div className="flex h-screen bg-black text-gray-100">
             {/* Left Sidebar with File Explorer */}
-            <div className="w-64 border-r border-gray-700 overflow-y-auto bg-gray-800">
-
-                {/* File Tree */}
+            <div className="w-64 border-r border-gray-800 overflow-y-auto bg-black">
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="flex justify-center items-center py-4">
@@ -276,253 +284,54 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                             {files.map((file, index) => (
                                 <div
                                     key={index}
-                                    className="flex items-center px-4 py-2 hover:bg-gray-700 cursor-pointer transition-colors duration-150 ease-in-out"
+                                    className="flex items-center px-4 py-2 hover:bg-gray-900 cursor-pointer transition-colors duration-150 ease-in-out"
                                     onClick={() => handleFileClick(file)}
                                 >
                                     <div className="flex items-center gap-2" style={{ paddingLeft: `${currentPath.length * 12}px` }}>
-                                        {file.type === 'dir' ? (
-                                            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                            </svg>
-                                        ) : (
-                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                            </svg>
-                                        )}
+                                        <span className="w-6">
+                                            {file.type === 'dir' ? '📁' : getFileIcon(file.name)}
+                                        </span>
                                         <span className="truncate text-gray-200">{file.name}</span>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
-                </button>
-
-                <div className="flex gap-2">
-                    {fileContent && !showTechStack && (
-                        <button
-                            className={`px-4 py-2 rounded flex items-center gap-2 ${
-                                darkMode 
-                                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
-                                    : 'bg-purple-500 text-white hover:bg-purple-600'
-                            } transition-colors`}
-                            onClick={generateDiagram}
-                            disabled={generatingDiagram}
-                        >
-                            {generatingDiagram ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                    Generating...
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                    </svg>
-                                    Visualize Code
-                                </>
-                            )}
-                        </button>
-                    )}
-
-                    <button
-                        className={`px-4 py-2 rounded flex items-center gap-2 ${
-                            darkMode 
-                                ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                                : 'bg-blue-500 text-white hover:bg-blue-600'
-                        } transition-colors`}
-                        onClick={analyzeTechStack}
-                        disabled={loadingTechStack}
-                    >
-                        {loadingTechStack ? (
-                            <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                Analyzing...
-                            </>
-                        ) : (
-                            <>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                </svg>
-                                Analyze Tech Stack
-                            </>
-                        )}
-                    </button>
                 </div>
             </div>
 
-            {/* Main content */}
-            {showTechStack ? (
-                <TechStackViewer 
-                    dependencies={dependencies} 
-                    onBack={() => setShowTechStack(false)} 
-                />
-            ) : (
-                <>
+            {/* Right Content Area */}
+            <div className="flex-1 flex flex-col">
+                {/* Top Section - Breadcrumb Navigation */}
+                <div className="p-4 border-b border-gray-800 bg-black">
+                    <div className="flex items-center gap-2">
+                        {currentPath.map((segment, index) => (
+                            <span key={index} className="flex items-center">
+                                {index > 0 && <span className="text-gray-500 mx-1">/</span>}
+                                <span
+                                    className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer transition-colors duration-150"
+                                    onClick={() => navigateToPath(index)}
+                                >
+                                    {segment}
+                                </span>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Bottom Section - File Content */}
+                <div className="flex-1 overflow-y-auto p-4 bg-black">
                     {loading ? (
                         <div className="flex justify-center items-center py-12">
                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
                         </div>
-                    ) : (
-                        <div>
-                            {/* Breadcrumb navigation */}
-                            <div className={`flex items-center mb-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                <span 
-                                    className={`cursor-pointer hover:underline ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}
-                                    onClick={() => {
-                                        setCurrentPath([]);
-                                        fetchDirectoryContents('');
-                                        setFileContent('');
-                                        setCurrentFileName('');
-                                        setCurrentFileType('');
-                                    }}
-                                >
-                                    {repoName}
-                                </span>
-                                
-                                {currentPath.map((segment, index) => (
-                                    <span key={index} className="flex items-center">
-                                        <span className="mx-2">/</span>
-                                        <span 
-                                            className={`cursor-pointer hover:underline ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}
-                                            onClick={() => navigateToPath(index)}
-                                        >
-                                            {segment}
-                                        </span>
-                                    </span>
-                                ))}
-                            </div>
-                            
-                            {/* Show file list or file content */}
-                            {fileContent ? (
-                                <div>
-                                    {showDiagram ? (
-                                        <div className={`border rounded-lg p-4 ${
-                                            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'
-                                        }`}>
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold">
-                                                    Code Visualization: {currentFileName}
-                                                </h3>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        className={`px-3 py-1 text-sm rounded ${
-                                                            darkMode 
-                                                                ? 'bg-gray-700 text-blue-400 hover:bg-gray-600' 
-                                                                : 'bg-gray-200 text-blue-600 hover:bg-gray-300'
-                                                        }`}
-                                                        onClick={() => setShowDiagram(false)}
-                                                    >
-                                                        Show Code
-                                                    </button>
-                                                    <button
-                                                        className={`px-3 py-1 text-sm rounded ${
-                                                            darkMode 
-                                                                ? 'bg-gray-700 text-purple-400 hover:bg-gray-600' 
-                                                                : 'bg-gray-200 text-purple-600 hover:bg-gray-300'
-                                                        }`}
-                                                        onClick={generateDiagram}
-                                                        disabled={generatingDiagram}
-                                                    >
-                                                        Regenerate
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            
-                                            {diagramError ? (
-                                                <div className={`p-4 rounded-lg border ${darkMode ? 'bg-red-900/20 border-red-800 text-red-200' : 'bg-red-50 border-red-200 text-red-600'}`}>
-                                                    <p>Failed to generate diagram: {diagramError}</p>
-                                                </div>
-                                            ) : (
-                                                <MermaidRenderer 
-                                                    diagram={mermaidDiagram} 
-                                                    darkMode={darkMode} 
-                                                />
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className={`border rounded-lg p-4 ${
-                                            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'
-                                        }`}>
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold">
-                                                    {currentFileName}
-                                                </h3>
-                                                {mermaidDiagram && (
-                                                    <button
-                                                        className={`px-3 py-1 text-sm rounded ${
-                                                            darkMode 
-                                                                ? 'bg-gray-700 text-purple-400 hover:bg-gray-600' 
-                                                                : 'bg-gray-200 text-purple-600 hover:bg-gray-300'
-                                                        }`}
-                                                        onClick={() => setShowDiagram(true)}
-                                                    >
-                                                        Show Diagram
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className="mb-4">
-                                                <button
-                                                    className={`hover:underline flex items-center gap-2 ${
-                                                        darkMode ? 'text-blue-400' : 'text-blue-600'
-                                                    }`}
-                                                    onClick={() => setFileContent('')}
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                                    </svg>
-                                                    Back to files
-                                                </button>
-                                            </div>
-                                            <pre className="whitespace-pre-wrap font-mono text-sm">{fileContent}</pre>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
-                                    {files.map((file, index) => (
-                                        <div
-                                            key={index}
-                                            className={`flex items-center gap-2 p-2 cursor-pointer rounded ${
-                                                darkMode 
-                                                    ? 'hover:bg-gray-800' 
-                                                    : 'hover:bg-gray-100'
-                                            }`}
-                                            onClick={() => handleFileClick(file)}
-                                        >
-                                            {file.type === 'dir' ? (
-                                                <svg className={`w-5 h-5 ${
-                                                    darkMode ? 'text-blue-400' : 'text-blue-600'
-                                                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                                </svg>
-                                            ) : (
-                                                <svg className={`w-5 h-5 ${
-                                                    darkMode ? 'text-gray-400' : 'text-gray-600'
-                                                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                                </svg>
-                                            )}
-                                            <span>{file.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                    ) : fileContent ? (
+                        <div className="bg-black rounded-lg p-4 h-full">
+                            <pre className="font-mono text-sm text-gray-200 whitespace-pre-wrap overflow-x-auto p-4 rounded">{fileContent}</pre>
                         </div>
                     ) : null}
                 </div>
             </div>
-
-            {/* Tech Stack Viewer Modal */}
-            {showTechStack && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                        <TechStackViewer
-                            dependencies={dependencies}
-                            onBack={() => setShowTechStack(false)}
-                        />
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

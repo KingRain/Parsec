@@ -9,7 +9,7 @@ export default function ProjectPage() {
     const projectName = params.projectName as string;
 
     return (
-        <main className="p-4">
+        <main className="min-h-screen w-full h-full pt-4">
             <h1 className="text-2xl font-bold mb-6">{projectName}</h1>
             <FileViewer
                 repoOwner={username}
