@@ -8,6 +8,7 @@ import {
   fetchPackageMetadata, 
   fetchLLMDescriptions 
 } from '../utils/dependencyAnalyzer';
+import { getGitHubFetchOptions } from '../utils/githubAuth';
 
 interface FileViewerProps {
     repoOwner: string;
@@ -50,7 +51,10 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     const fetchDirectoryContents = async (path: string) => {
         setLoading(true);
         try {
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`);
+            const response = await fetch(
+                `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`,
+                getGitHubFetchOptions()
+            );
             
             if (!response.ok) {
                 throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -68,7 +72,10 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     const fetchFileContent = async (path: string) => {
         setLoading(true);
         try {
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`);
+            const response = await fetch(
+                `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`,
+                getGitHubFetchOptions()
+            );
             
             if (!response.ok) {
                 throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -85,7 +92,10 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
                 const content = atob(fileData.content.replace(/\n/g, ''));
                 setFileContent(content);
             } else {
-                const contentResponse = await fetch(fileData.download_url);
+                const contentResponse = await fetch(
+                    fileData.download_url,
+                    getGitHubFetchOptions()
+                );
                 const content = await contentResponse.text();
                 setFileContent(content);
             }
@@ -116,8 +126,16 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     const analyzeTechStack = async () => {
         setLoadingTechStack(true);
         try {
+            // Add timeout for the entire operation
+            const timeoutPromise = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Tech stack analysis timed out')), 30000)
+            );
+            
             // Step 1: Detect and fetch package.json
-            const packageData = await detectAndFetchPackageJson(repoOwner, repoName);
+            const packageDataPromise = detectAndFetchPackageJson(repoOwner, repoName);
+            
+            // Race the package.json fetch with a timeout
+            const packageData = await Promise.race([packageDataPromise, timeoutPromise]);
             
             if (!packageData) {
                 alert('No package.json found in this repository');
@@ -128,17 +146,51 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
             // Step 2: Extract dependencies
             const extractedDeps = extractDependencies(packageData);
             
-            // Step 3: Fetch logos and metadata
-            const depsWithMetadata = await fetchPackageMetadata(extractedDeps);
+            if (extractedDeps.length === 0) {
+                alert('No dependencies found in package.json');
+                setLoadingTechStack(false);
+                return;
+            }
             
-            // Step 4: Get LLM descriptions
-            const enrichedDeps = await fetchLLMDescriptions(depsWithMetadata);
+            // Step 3: Fetch logos and metadata (with 20 second timeout)
+            const metadataPromise = fetchPackageMetadata(extractedDeps);
+            const timeoutMetadata = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Metadata fetch timed out')), 20000)
+            );
+            
+            let depsWithMetadata: Dependency[] = extractedDeps;
+            try {
+                depsWithMetadata = await Promise.race([metadataPromise, timeoutMetadata]);
+            } catch (err) {
+                console.error('Error fetching metadata:', err);
+                // Continue with basic dependency information if metadata fetch fails
+            }
+            
+            // Step 4: Get LLM descriptions (with 15 second timeout)
+            let enrichedDeps: Dependency[] = depsWithMetadata;
+            try {
+                const descriptionPromise = fetchLLMDescriptions(depsWithMetadata);
+                const timeoutDescription = new Promise<never>((_, reject) => 
+                    setTimeout(() => reject(new Error('Description fetch timed out')), 15000)
+                );
+                
+                enrichedDeps = await Promise.race([descriptionPromise, timeoutDescription]);
+            } catch (err) {
+                console.error('Error fetching descriptions:', err);
+                // Continue without descriptions if that part fails
+            }
             
             setDependencies(enrichedDeps);
             setShowTechStack(true);
         } catch (error) {
             console.error('Failed to analyze tech stack:', error);
-            alert('Failed to analyze tech stack');
+            
+            // If we have any dependencies extracted, show them even if there was an error
+            if (dependencies.length > 0) {
+                setShowTechStack(true);
+            } else {
+                alert('Failed to analyze tech stack. Please try again or try another repository.');
+            }
         } finally {
             setLoadingTechStack(false);
         }
