@@ -84,6 +84,8 @@ We welcome contributions from the community! If you’d like to improve Parsec, 
 
 This project is licensed under the **MIT License**.
 
+:)
+
 ---
 
 ### **Parsec: Measuring the Distance Between Code and Understanding, One Diagram at a Time.**
