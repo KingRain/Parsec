@@ -18,9 +18,7 @@ export default function DetailsBrowser({
   repoOwner,
   repoName,
 }: DetailsBrowserProps) {
-  const [activeTab, setActiveTab] = useState<"codebase" | "graph" | "security">(
-    "codebase"
-  );
+  const [activeTab, setActiveTab] = useState<"codebase" | "graph">("codebase");
   const [dependencies, setDependencies] = useState<Dependency[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -93,17 +91,7 @@ export default function DetailsBrowser({
         >
           Codebase Info
         </button>
-        <button
-          onClick={() => setActiveTab("security")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "security"
-              ? "text-blue-400 border-b border-blue-400"
-              : "text-gray-400 hover:text-gray-200"
-          )}
-        >
-          Security Analysis
-        </button>
+
         <button
           onClick={() => setActiveTab("graph")}
           className={cn(
@@ -134,55 +122,45 @@ export default function DetailsBrowser({
             <div className="border border-gray-800 rounded p-1">
               <h3 className="text-sm font-medium mb-1">Dependencies</h3>
               <div className="flex flex-col gap-1">
-          {loading && (
-            <div className="text-sm text-gray-400">
-              Loading dependencies...
-            </div>
-          )}
-          {error && <div className="text-sm text-red-400">{error}</div>}
-          {!loading && !error && dependencies.length === 0 && (
-            <div className="text-sm text-gray-400">
-              No dependencies found
-            </div>
-          )}
-          {dependencies.map((dep, index) => (
-            <div key={index} className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-blue-400"></div>
-              <span className="text-sm">
-                <a
-            href={`https://www.npmjs.com/package/${dep.name}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-400 hover:underline"
-                >
-            {dep.name}
-                </a>{" "}
-                <span className="text-xs text-gray-400">
-            {dep.version}
-                </span>
-                {dep.deprecated && (
-            <span className="ml-1 text-xs bg-red-900 text-red-300 px-1 py-0.5 rounded">
-              deprecated
-            </span>
+                {loading && (
+                  <div className="text-sm text-gray-400">
+                    Loading dependencies...
+                  </div>
                 )}
-              </span>
-            </div>
-          ))}
+                {error && <div className="text-sm text-red-400">{error}</div>}
+                {!loading && !error && dependencies.length === 0 && (
+                  <div className="text-sm text-gray-400">
+                    No dependencies found
+                  </div>
+                )}
+                {dependencies.map((dep, index) => (
+                  <div key={index} className="flex items-center gap-1">
+                    <div className="h-2 w-2 rounded-full bg-blue-400"></div>
+                    <span className="text-sm">
+                      <a
+                        href={`https://www.npmjs.com/package/${dep.name}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:underline"
+                      >
+                        {dep.name}
+                      </a>{" "}
+                      <span className="text-xs text-gray-400">
+                        {dep.version}
+                      </span>
+                      {dep.deprecated && (
+                        <span className="ml-1 text-xs bg-red-900 text-red-300 px-1 py-0.5 rounded">
+                          deprecated
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
-        <div
-          className={cn(
-            "w-full h-full",
-            activeTab === "security" ? "block" : "hidden"
-          )}
-        >
-          Security Analysis Content
-          <div className="w-full h-full p-4">
-            {/* Security Analysis content placeholder */}
-          </div>
-        </div>
+
         <div
           className={cn(
             "w-full h-full",
