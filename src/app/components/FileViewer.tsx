@@ -1,6 +1,13 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import TechStackViewer from './TechStackViewer';
+import { 
+  detectAndFetchPackageJson, 
+  extractDependencies, 
+  fetchPackageMetadata, 
+  fetchLLMDescriptions 
+} from '../utils/dependencyAnalyzer';
 
 interface FileViewerProps {
     repoOwner: string;
@@ -13,11 +20,32 @@ interface FileItem {
     path: string;
 }
 
+interface Dependency {
+  name: string;
+  version: string;
+  type: string;
+  description?: string;
+  homepage?: string;
+  logoUrl?: string;
+  llmDescription?: string;
+}
+
 export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     const [currentPath, setCurrentPath] = useState<string[]>([]);
     const [files, setFiles] = useState<FileItem[]>([]);
     const [fileContent, setFileContent] = useState<string>('');
     const [loading, setLoading] = useState(false);
+    const [dependencies, setDependencies] = useState<Dependency[]>([]);
+    const [showTechStack, setShowTechStack] = useState(false);
+    const [loadingTechStack, setLoadingTechStack] = useState(false);
+    const [darkMode, setDarkMode] = useState(true);
+
+    // Fetch repository contents immediately when component mounts
+    useEffect(() => {
+        if (repoOwner && repoName) {
+            fetchDirectoryContents('');
+        }
+    }, [repoOwner, repoName]);
 
     const fetchDirectoryContents = async (path: string) => {
         setLoading(true);
@@ -85,81 +113,189 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
         setFileContent('');
     };
 
+    const analyzeTechStack = async () => {
+        setLoadingTechStack(true);
+        try {
+            // Step 1: Detect and fetch package.json
+            const packageData = await detectAndFetchPackageJson(repoOwner, repoName);
+            
+            if (!packageData) {
+                alert('No package.json found in this repository');
+                setLoadingTechStack(false);
+                return;
+            }
+            
+            // Step 2: Extract dependencies
+            const extractedDeps = extractDependencies(packageData);
+            
+            // Step 3: Fetch logos and metadata
+            const depsWithMetadata = await fetchPackageMetadata(extractedDeps);
+            
+            // Step 4: Get LLM descriptions
+            const enrichedDeps = await fetchLLMDescriptions(depsWithMetadata);
+            
+            setDependencies(enrichedDeps);
+            setShowTechStack(true);
+        } catch (error) {
+            console.error('Failed to analyze tech stack:', error);
+            alert('Failed to analyze tech stack');
+        } finally {
+            setLoadingTechStack(false);
+        }
+    };
+
     return (
-        <div className="mt-4">
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center gap-2 p-2 bg-gray-100 rounded mb-4">
-                <span 
-                    className="text-blue-600 cursor-pointer hover:underline"
-                    onClick={() => {
-                        setCurrentPath([]);
-                        fetchDirectoryContents('');
-                        setFileContent('');
-                    }}
+        <div className={`mt-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black'}`}>
+            {/* Top Bar with Theme Toggle and Tech Stack Analysis Button */}
+            <div className="flex justify-between items-center mb-4">
+                <button
+                    className={`p-2 rounded-full ${darkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-200 text-gray-600'}`}
+                    onClick={() => setDarkMode(!darkMode)}
+                    aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
                 >
-                    {repoName}
-                </span>
-                {currentPath.map((segment, index) => (
-                    <span key={index}>
-                        <span className="text-gray-500 mx-1">/</span>
-                        <span 
-                            className="text-blue-600 cursor-pointer hover:underline"
-                            onClick={() => navigateToPath(index)}
-                        >
-                            {segment}
-                        </span>
-                    </span>
-                ))}
+                    {darkMode ? (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" />
+                        </svg>
+                    ) : (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                        </svg>
+                    )}
+                </button>
+
+                <button
+                    className={`px-4 py-2 rounded flex items-center gap-2 ${
+                        darkMode 
+                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                    } transition-colors`}
+                    onClick={analyzeTechStack}
+                    disabled={loadingTechStack}
+                >
+                    {loadingTechStack ? (
+                        <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Analyzing...
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            Analyze Tech Stack
+                        </>
+                    )}
+                </button>
             </div>
 
-            {loading ? (
-                <div className="flex justify-center items-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                </div>
+            {/* Show either tech stack analysis or file browser */}
+            {showTechStack ? (
+                <TechStackViewer 
+                    dependencies={dependencies} 
+                    onBack={() => setShowTechStack(false)} 
+                />
             ) : (
-                <div className="grid grid-cols-1 gap-4">
-                    {/* File List */}
-                    {!fileContent && (
-                        <div className="border rounded-lg overflow-hidden">
-                            {files.map((file, index) => (
-                                <div
-                                    key={index}
-                                    className="p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer flex items-center gap-2"
-                                    onClick={() => handleFileClick(file)}
+                <>
+                    {/* Breadcrumb Navigation */}
+                    <div className={`flex items-center gap-2 p-2 rounded mb-4 ${
+                        darkMode ? 'bg-gray-800' : 'bg-gray-100'
+                    }`}>
+                        <span 
+                            className={`cursor-pointer hover:underline ${
+                                darkMode ? 'text-blue-400' : 'text-blue-600'
+                            }`}
+                            onClick={() => {
+                                setCurrentPath([]);
+                                fetchDirectoryContents('');
+                                setFileContent('');
+                            }}
+                        >
+                            {repoName}
+                        </span>
+                        {currentPath.map((segment, index) => (
+                            <span key={index}>
+                                <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
+                                    /
+                                </span>
+                                <span 
+                                    className={`cursor-pointer hover:underline ml-1 ${
+                                        darkMode ? 'text-blue-400' : 'text-blue-600'
+                                    }`}
+                                    onClick={() => navigateToPath(index)}
                                 >
-                                    {file.type === 'dir' ? (
-                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                        </svg>
-                                    ) : (
-                                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                        </svg>
-                                    )}
-                                    <span>{file.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                    {segment}
+                                </span>
+                            </span>
+                        ))}
+                    </div>
 
-                    {/* File Content */}
-                    {fileContent && (
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                            <div className="mb-4">
-                                <button
-                                    className="text-blue-600 hover:underline flex items-center gap-2"
-                                    onClick={() => setFileContent('')}
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                    </svg>
-                                    Back to files
-                                </button>
-                            </div>
-                            <pre className="whitespace-pre-wrap font-mono text-sm">{fileContent}</pre>
+                    {loading ? (
+                        <div className="flex justify-center items-center py-4">
+                            <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
+                                darkMode ? 'border-white' : 'border-gray-900'
+                            }`}></div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4">
+                            {/* File List */}
+                            {!fileContent && (
+                                <div className={`border rounded-lg overflow-hidden ${
+                                    darkMode ? 'border-gray-700' : ''
+                                }`}>
+                                    {files.map((file, index) => (
+                                        <div
+                                            key={index}
+                                            className={`p-3 border-b last:border-b-0 cursor-pointer flex items-center gap-2 ${
+                                                darkMode 
+                                                    ? 'border-gray-700 hover:bg-gray-800' 
+                                                    : 'hover:bg-gray-50'
+                                            }`}
+                                            onClick={() => handleFileClick(file)}
+                                        >
+                                            {file.type === 'dir' ? (
+                                                <svg className={`w-5 h-5 ${
+                                                    darkMode ? 'text-blue-400' : 'text-blue-600'
+                                                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                                </svg>
+                                            ) : (
+                                                <svg className={`w-5 h-5 ${
+                                                    darkMode ? 'text-gray-400' : 'text-gray-600'
+                                                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                </svg>
+                                            )}
+                                            <span>{file.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* File Content */}
+                            {fileContent && (
+                                <div className={`border rounded-lg p-4 ${
+                                    darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'
+                                }`}>
+                                    <div className="mb-4">
+                                        <button
+                                            className={`hover:underline flex items-center gap-2 ${
+                                                darkMode ? 'text-blue-400' : 'text-blue-600'
+                                            }`}
+                                            onClick={() => setFileContent('')}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                            </svg>
+                                            Back to files
+                                        </button>
+                                    </div>
+                                    <pre className="whitespace-pre-wrap font-mono text-sm">{fileContent}</pre>
+                                </div>
+                            )}
                         </div>
                     )}
-                </div>
+                </>
             )}
         </div>
     );
