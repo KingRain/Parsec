@@ -1,26 +1,103 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerativeModel } from "@google/generative-ai";
 
 // Initialize the Gemini model
-const getModel = () => {
+const getModel = (): GenerativeModel => {
   const apiKey = process.env.GOOGLE_API_KEY;
   
   if (!apiKey) {
     throw new Error('GOOGLE_API_KEY is not set in environment variables');
   }
   
-  return new ChatGoogleGenerativeAI({
-    apiKey,
-    model: "gemini-1.5-flash",
-    temperature: 0.2,
-    maxRetries: 2,
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return genAI.getGenerativeModel({ 
+    model: "gemini-2.0-flash-lite",
+    safetySettings: [
+      {
+        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+      },
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      topP: 0.8,
+      topK: 40,
+      maxOutputTokens: 8192,
+    },
   });
 };
 
+// Function to validate Mermaid syntax
+function validateMermaidSyntax(code: string): boolean {
+  // Basic validation
+  if (!code || code.length < 10) return false;
+  
+  // Check for common diagram types
+  const validTypes = ['graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 'stateDiagram', 'erDiagram', 'gitGraph'];
+  const firstLine = code.split('\n')[0].trim();
+  const hasValidStart = validTypes.some(type => firstLine.startsWith(type));
+  
+  if (!hasValidStart) return false;
+  
+  // Check for balanced brackets/parentheses
+  const brackets: string[] = [];
+  for (const char of code) {
+    if (char === '{' || char === '(' || char === '[') {
+      brackets.push(char);
+    } else if (char === '}') {
+      if (brackets.pop() !== '{') return false;
+    } else if (char === ')') {
+      if (brackets.pop() !== '(') return false;
+    } else if (char === ']') {
+      if (brackets.pop() !== '[') return false;
+    }
+  }
+  
+  return brackets.length === 0;
+}
+
+// Extract Mermaid code from text
+function extractMermaidFromText(text: string): { mermaidCode: string; diagramType: string } {
+  let mermaidCode = '';
+  let diagramType = '';
+  
+  // Extract Mermaid code between triple backticks if present
+  const mermaidMatch = text.match(/```(?:mermaid)?\s*([\s\S]*?)```/);
+  if (mermaidMatch && mermaidMatch[1]) {
+    mermaidCode = mermaidMatch[1].trim();
+  } else {
+    // If no backticks, try to extract based on common Mermaid starting syntax
+    const lines = text.split('\n');
+    const startIndex = lines.findIndex((line: string) => 
+      /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram)/.test(line.trim())
+    );
+    
+    if (startIndex !== -1) {
+      mermaidCode = lines.slice(startIndex).join('\n').trim();
+    } else {
+      // Last resort: use the entire text (might not work well)
+      mermaidCode = text;
+    }
+  }
+  
+  // Try to detect diagram type from the code
+  const firstLine = mermaidCode.split('\n')[0].trim();
+  diagramType = firstLine.split(' ')[0];
+  
+  return { mermaidCode, diagramType };
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { fileContent, fileName, fileType } = await request.json();
+    const { fileContent, fileName, fileType } = await request.json() as {
+      fileContent: string;
+      fileName?: string;
+      fileType?: string;
+    };
     
     if (!fileContent) {
       return NextResponse.json(
@@ -39,49 +116,72 @@ export async function POST(request: NextRequest) {
     const model = getModel();
 
     // System prompt with instructions
-    const systemPrompt = `
-      You are an expert code analyzer that creates Mermaid diagrams to visualize code structure and flow.
-      Analyze the provided code file and generate a comprehensive Mermaid diagram that best represents its structure.
-      
-      Follow these guidelines:
-      1. Choose the most appropriate diagram type (flowchart, class diagram, sequence diagram, etc.) based on the code.
-      2. For code files, focus on showing the main components, relationships, and flows.
-      3. Include classes, functions, methods, and their relationships where relevant.
-      4. Use clear naming and appropriate styling.
-      5. Keep the diagram readable - simplify complex parts if needed.
-      6. IMPORTANT: Output ONLY valid Mermaid syntax without any explanations or comments.
-      
-      For different file types, prioritize:
-      - JavaScript/TypeScript: Show component structure, data flow, and function relationships
-      - Python: Show class hierarchies, function calls, and program flow
-      - HTML/CSS: Show document structure or style relationships
-      - Java/C#: Show class structure, inheritance, and method relationships
-      
-      Return only the Mermaid diagram code without backticks, starting directly with the diagram type.
-    `;
+    const prompt = `
+You are an expert code analyzer that creates Mermaid diagrams to visualize code structure.
 
-    // Create the prompt
-    const messages = [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(`
-        File name: ${fileName || 'unknown'}
-        File type: ${fileType || 'unknown'}
-        
-        Code:
-        ${trimmedContent}
-      `)
-    ];
+I need you to create a Mermaid diagram for this code file. Your response must ONLY contain the Mermaid syntax - no explanation, no markdown formatting, just pure Mermaid diagram code.
+
+File name: ${fileName || 'unknown'}
+File type: ${fileType || 'unknown'}
+
+Code:
+${trimmedContent}
+
+IMPORTANT INSTRUCTIONS:
+1. Choose the most appropriate diagram type:
+   - For classes or objects: use classDiagram
+   - For workflows or execution paths: use flowchart TD
+   - For state machines: use stateDiagram-v2
+   - For API/function interactions: use sequenceDiagram
+
+2. Ensure your diagram has:
+   - Clear, descriptive labels
+   - Proper relationships between elements
+   - Logical organization (top-to-bottom flow if applicable)
+   - Styling for better visualization when helpful
+
+3. Your response format MUST be valid Mermaid syntax ONLY, starting directly with the diagram type declaration (e.g., "flowchart TD" or "classDiagram").
+
+4. DO NOT include:
+   - Explanations or commentary
+   - Markdown code fences (\`\`\`)
+   - Anything other than the pure Mermaid diagram code
+
+5. Simplify complex parts of the code while maintaining the important structural elements.
+`;
 
     // Generate the diagram
-    const response = await model.invoke(messages);
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.8,
+        topK: 40,
+      }
+    });
+
+    const response = result.response;
+    const responseText = response.text();
     
-    // Clean up the response to ensure it's valid Mermaid syntax
-    let mermaidCode = response.content.toString();
+    // Extract and validate the diagram
+    const { mermaidCode, diagramType } = extractMermaidFromText(responseText);
     
-    // Remove backticks and "mermaid" if they exist
-    mermaidCode = mermaidCode.replace(/```mermaid\n?/g, '').replace(/```/g, '').trim();
+    // Final validation
+    if (!mermaidCode || !validateMermaidSyntax(mermaidCode)) {
+      // If validation fails, create a simple fallback diagram
+      const fallbackDiagram = generateFallbackDiagram(fileName || 'file');
+      
+      return NextResponse.json({ 
+        diagram: fallbackDiagram,
+        type: 'flowchart',
+        fallback: true
+      });
+    }
     
-    return NextResponse.json({ diagram: mermaidCode });
+    return NextResponse.json({ 
+      diagram: mermaidCode,
+      type: diagramType
+    });
   } catch (error) {
     console.error('Error generating diagram:', error);
     return NextResponse.json(
@@ -89,4 +189,19 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Generate a simple fallback diagram when normal generation fails
+function generateFallbackDiagram(fileName: string): string {
+  return `flowchart TD
+    A[${fileName}] --> B[Main Components]
+    B --> C[Logic]
+    B --> D[Data]
+    B --> E[UI Elements]
+    
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#bbf,stroke:#333,stroke-width:1px
+    style C fill:#dfd,stroke:#333,stroke-width:1px
+    style D fill:#dfd,stroke:#333,stroke-width:1px
+    style E fill:#dfd,stroke:#333,stroke-width:1px`;
 } 
