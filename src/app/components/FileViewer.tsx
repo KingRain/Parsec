@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { getGitHubFetchOptions } from '../utils/githubAuth';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useRouter } from 'next/navigation';
 
 interface FileViewerProps {
     repoOwner: string;
@@ -18,7 +17,6 @@ interface FileItem {
 }
 
 export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
-    const router = useRouter();
     const [currentPath, setCurrentPath] = useState<string[]>([]);
     const [files, setFiles] = useState<FileItem[]>([]);
     const [fileContent, setFileContent] = useState<string>('');
@@ -35,10 +33,6 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
             fetchDirectoryContents('');
         }
     }, [repoOwner, repoName]);
-
-    const handleBack = () => {
-        router.back();
-    };
 
     const getFileIcon = (fileName: string) => {
         const extension = fileName.split('.').pop()?.toLowerCase();
@@ -268,111 +262,86 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-black text-gray-100">
-            <div className="p-3 border-b border-gray-800 bg-black">
-                <button 
-                    onClick={handleBack}
-                    className="flex items-center text-gray-300 hover:text-white transition-colors"
-                >
-                    <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="20" 
-                        height="20" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        className="mr-2"
-                    >
-                        <path d="M19 12H5M12 19l-7-7 7-7" />
-                    </svg>
-                    <span className="text-sm font-medium">Back</span>
-                </button>
-            </div>
-
-            <div className="flex flex-1">
-                <div className="w-64 border-r border-gray-800 overflow-y-auto bg-black">
-                    <div className="flex-1 overflow-y-auto">
-                        {loading ? (
-                            <div className="flex justify-center items-center py-4">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-                            </div>
-                        ) : (
-                            <div className="py-0">
-                                {files.map((file, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-center py-1 hover:bg-gray-900 cursor-pointer transition-colors duration-150 ease-in-out"
-                                        onClick={() => handleFileClick(file)}
-                                    >
-                                        <div className="flex items-center gap-2" style={{ paddingLeft: `${currentPath.length * 12}px` }}>
-                                            <span className="w-6">
-                                                {file.type === 'dir' ? '📁' : getFileIcon(file.name)}
-                                            </span>
-                                            <span className="truncate text-gray-200">{file.name}</span>
-                                        </div>
+        <div className="flex h-screen bg-black text-gray-100">
+            <div className="w-64 border-r border-gray-800 overflow-y-auto bg-black">
+                <div className="flex-1 overflow-y-auto">
+                    {loading ? (
+                        <div className="flex justify-center items-center py-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                        </div>
+                    ) : (
+                        <div className="py-0">
+                            {files.map((file, index) => (
+                                <div
+                                    key={index}
+                                    className="flex items-center py-1 hover:bg-gray-900 cursor-pointer transition-colors duration-150 ease-in-out"
+                                    onClick={() => handleFileClick(file)}
+                                >
+                                    <div className="flex items-center gap-2" style={{ paddingLeft: `${currentPath.length * 12}px` }}>
+                                        <span className="w-6">
+                                            {file.type === 'dir' ? '📁' : getFileIcon(file.name)}
+                                        </span>
+                                        <span className="truncate text-gray-200">{file.name}</span>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    
-                    {fileContent && (
-                        <div className="px-3 py-3 border-t border-gray-800">
-                            <button
-                                className="px-3 py-2 w-full bg-purple-700 hover:bg-purple-600 text-white rounded flex items-center justify-center gap-2 transition-colors"
-                                onClick={generateDiagram}
-                                disabled={generatingDiagram}
-                            >
-                                {generatingDiagram ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                        <span>Generating...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                        <span>Visualize Code</span>
-                                    </>
-                                )}
-                            </button>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
+                
+                {fileContent && (
+                    <div className="px-3 py-3 border-t border-gray-800">
+                        <button
+                            className="px-3 py-2 w-full bg-purple-700 hover:bg-purple-600 text-white rounded flex items-center justify-center gap-2 transition-colors"
+                            onClick={generateDiagram}
+                            disabled={generatingDiagram}
+                        >
+                            {generatingDiagram ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <span>Generating...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    <span>Visualize Code</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
+            </div>
 
-                <div className="flex-1 flex flex-col">
-                    <div className="p-4 border-b border-gray-800 bg-black overflow-x-auto">
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                            {currentPath.map((segment, index) => (
-                                <span key={index} className="flex items-center">
-                                    {index > 0 && <span className="text-gray-500 mx-1">/</span>}
-                                    <span
-                                        className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer transition-colors duration-150"
-                                        onClick={() => navigateToPath(index)}
-                                    >
-                                        {segment}
-                                    </span>
+            <div className="flex-1 flex flex-col">
+                <div className="p-4 border-b border-gray-800 bg-black overflow-x-auto">
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                        {currentPath.map((segment, index) => (
+                            <span key={index} className="flex items-center">
+                                {index > 0 && <span className="text-gray-500 mx-1">/</span>}
+                                <span
+                                    className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer transition-colors duration-150"
+                                    onClick={() => navigateToPath(index)}
+                                >
+                                    {segment}
                                 </span>
-                            ))}
-                        </div>
+                            </span>
+                        ))}
                     </div>
+                </div>
 
-                    <div className="flex-1 overflow-y-auto overflow-x-auto p-4 bg-black">
-                        {fileContent && (
-                            <SyntaxHighlighter
-                                language={getLanguageFromFileType(currentFileType)}
-                                style={vscDarkPlus}
-                                className="rounded-lg"
-                                wrapLongLines={false}
-                            >
-                                {fileContent}
-                            </SyntaxHighlighter>
-                        )}
-                    </div>
+                <div className="flex-1 overflow-y-auto overflow-x-auto p-4 bg-black">
+                    {fileContent && (
+                        <SyntaxHighlighter
+                            language={getLanguageFromFileType(currentFileType)}
+                            style={vscDarkPlus}
+                            className="rounded-lg"
+                            wrapLongLines={false}
+                        >
+                            {fileContent}
+                        </SyntaxHighlighter>
+                    )}
                 </div>
             </div>
         </div>
