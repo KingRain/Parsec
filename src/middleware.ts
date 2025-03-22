@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export function middleware(req: NextRequest) {
   const githubToken = req.cookies.get('github_token')?.value;
-  const url = req.nextUrl.clone();
   
   try {
     // Protected routes - redirect to home if not authenticated
