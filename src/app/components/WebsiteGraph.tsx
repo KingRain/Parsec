@@ -35,6 +35,8 @@ export default function WebsiteGraph({
   const [viewMode, setViewMode] = useState<"simple" | "detailed">("simple");
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const downloadDropdownRef = useRef<HTMLDivElement>(null);
 
   const fixSpecificSyntaxError = (input: string): string => {
     const lines = input.split("\n");
@@ -69,7 +71,7 @@ export default function WebsiteGraph({
     return result.join("\n");
   };
 
-  const handleDownload = () => {
+  const handleDownloadSvg = () => {
     if (svgContent) {
       const blob = new Blob([svgContent], { type: "image/svg+xml" });
       const url = URL.createObjectURL(blob);
@@ -81,6 +83,87 @@ export default function WebsiteGraph({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
+    setShowDownloadDropdown(false);
+  };
+
+  const handleDownloadJpeg = () => {
+    if (svgContent && containerRef.current) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        
+        const jpegUrl = canvas.toDataURL('image/jpeg');
+        const a = document.createElement('a');
+        a.href = jpegUrl;
+        a.download = `diagram-${Date.now()}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      
+      // Convert SVG to data URL
+      const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(svgBlob);
+      img.src = url;
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        alert('Failed to convert to JPEG');
+      };
+    }
+    setShowDownloadDropdown(false);
+  };
+
+  const handleDownloadPdf = () => {
+    if (svgContent) {
+      // Using a simple approach that opens a new window with the SVG and instructs user to print
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Diagram PDF</title>
+              <style>
+                body { margin: 0; display: flex; justify-content: center; }
+                svg { max-width: 100%; height: auto; }
+              </style>
+            </head>
+            <body>
+              ${svgContent}
+              <script>
+                window.onload = () => {
+                  setTimeout(() => {
+                    window.print();
+                  }, 500);
+                };
+              </script>
+            </body>
+          </html>
+        `);
+      }
+    }
+    setShowDownloadDropdown(false);
+  };
+
+  const handleDownloadMarkdown = () => {
+    if (processedGraph) {
+      const markdownContent = "```mermaid\n" + processedGraph + "\n```";
+      const blob = new Blob([markdownContent], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `diagram-${Date.now()}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+    setShowDownloadDropdown(false);
   };
 
   useEffect(() => {
@@ -223,6 +306,20 @@ export default function WebsiteGraph({
     };
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (downloadDropdownRef.current && !downloadDropdownRef.current.contains(event.target as Node)) {
+        setShowDownloadDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-4">
@@ -315,17 +412,50 @@ export default function WebsiteGraph({
             {isFullscreen ? 'Exit' : 'Fullscreen'}
           </button>
           
-          <button
-            onClick={handleDownload}
-            disabled={!svgContent}
-            className="px-2 py-1 bg-gray-700 text-gray-300 rounded-md flex items-center text-xs hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:hover:bg-gray-700 disabled:cursor-not-allowed"
-            title="Download as SVG"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download
-          </button>
+          <div className="relative" ref={downloadDropdownRef}>
+            <button
+              onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+              disabled={!svgContent}
+              className="px-2 py-1 bg-gray-700 text-gray-300 rounded-md flex items-center text-xs hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:hover:bg-gray-700 disabled:cursor-not-allowed"
+              title="Download options"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download
+            </button>
+            
+            {showDownloadDropdown && (
+              <div className="absolute right-0 mt-1 w-36 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-20">
+                <div className="py-1">
+                  <button
+                    onClick={handleDownloadSvg}
+                    className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700"
+                  >
+                    SVG
+                  </button>
+                  <button
+                    onClick={handleDownloadJpeg}
+                    className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700"
+                  >
+                    JPEG
+                  </button>
+                  <button
+                    onClick={handleDownloadPdf}
+                    className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700"
+                  >
+                    PDF
+                  </button>
+                  <button
+                    onClick={handleDownloadMarkdown}
+                    className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700"
+                  >
+                    Markdown
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
