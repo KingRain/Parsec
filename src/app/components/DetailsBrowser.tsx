@@ -26,6 +26,8 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
   const [graphData, setGraphData] = useState<string>("graph TD;");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState<"simple" | "detailed">("simple");
+  const [repoFiles, setRepoFiles] = useState<{path: string}[]>([]);
   
   useEffect(() => {
     const abortController = new AbortController();
@@ -68,7 +70,8 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
       
       try {
         const files = await fetchRepoFiles(repoOwner, repoName);
-        const response = await analyzeWithGemini(repoOwner, repoName, files);
+        setRepoFiles(files);
+        const response = await analyzeWithGemini(repoOwner, repoName, files, viewMode);
         
         console.log("Raw AI Response:", response);
         
@@ -90,6 +93,47 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
 
     return () => abortController.abort();
   }, [activeTab, repoOwner, repoName]);
+  
+  useEffect(() => {
+    if (activeTab !== "graph") return;
+    
+    const controller = new AbortController();
+    const { signal } = controller;
+    
+    const fetchData = async () => {
+      if (!repoFiles.length || loading) {
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        const response = await analyzeWithGemini(
+          repoOwner, 
+          repoName, 
+          repoFiles, 
+          viewMode
+        );
+        
+        if (!signal.aborted) {
+          console.log(`ViewMode changed to ${viewMode}, updating graph...`);
+          setGraphData(response);
+        }
+      } catch (err) {
+        if (!signal.aborted) {
+          console.error("Error updating graph with new view mode:", err);
+          setGraphData("graph TD;\n Error[\"Failed to update graph with " + viewMode + " view\"]");
+        }
+      } finally {
+        if (!signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchData();
+    
+    return () => controller.abort();
+  }, [viewMode, repoOwner, repoName, activeTab, repoFiles.length]);
 
   return (
     <div className="w-full h-full bg-black text-white border-slate-700 border-l p-2">
@@ -135,7 +179,13 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
             )}
           </>
         ) : activeTab === "graph" ? (
-          <WebsiteGraph graphData={graphData} repoOwner={repoOwner} repoName={repoName} />
+          <WebsiteGraph 
+            graphData={graphData} 
+            repoOwner={repoOwner} 
+            repoName={repoName}
+            files={repoFiles} 
+            onViewModeChange={setViewMode}
+          />
         ) : (
           <ChatBot ownerName={repoOwner} repoName={repoName}/>
         )}
