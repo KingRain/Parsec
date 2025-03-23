@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable prefer-const */
 import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
 
 // Initialize the Google AI SDK

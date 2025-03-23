@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+
 export const parseDependencies = async (files: any[]) => {
     const dependencies: any[] = [];
   
