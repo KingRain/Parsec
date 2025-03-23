@@ -6,7 +6,8 @@ const genAI = new GoogleGenerativeAI("AIzaSyDTlyP33hmBQ_y-LFIdZbWd7MVtm0U93JQ");
 export const analyzeWithGemini = async (
   repoOwner: string,
   repoName: string,
-  files: { path: string }[]
+  files: { path: string }[],
+  detailLevel: 'simple' | 'detailed' = 'simple'
 ): Promise<string> => {
   if (!Array.isArray(files) || files.length === 0) {
     return `flowchart TD
@@ -26,7 +27,7 @@ export const analyzeWithGemini = async (
   // Only pass file paths without fetching content
   const filePaths = files.map(file => file.path).join("\n");
 
-  const prompt = `
+  const simplePrompt = `
 You are an expert code architecture analyst tasked with predicting application structure based ONLY on file paths and names.
 
 **IMPORTANT RULES:**
@@ -59,12 +60,53 @@ ${filePaths}
 Keep your diagram SIMPLE. It's better to have a basic diagram that works than a complex one with syntax errors.
 `;
 
+  const detailedPrompt = `
+You are an expert code architecture analyst tasked with creating a comprehensive and detailed application structure diagram based ONLY on file paths and names.
+
+**IMPORTANT RULES:**
+1. Create a Mermaid flowchart using **flowchart TD** (top-down) format
+2. PREDICT the architecture in DETAIL WITHOUT seeing the actual code content:
+   - Thoroughly analyze file names/paths to identify components, services, utilities
+   - Create detailed logical groupings based on folder structure
+   - Make comprehensive predictions about relationships, data flow, and dependencies
+   - Identify potential design patterns from the file organization
+   - Include more nodes and connections to represent a detailed system architecture
+3. Still maintain VALID Mermaid syntax:
+   - "flowchart TD" must be on its first line
+   - Keep node IDs alphanumeric without spaces
+   - Use properly formatted node labels with DOUBLE QUOTES: Frontend["Frontend Components"]
+   - DO NOT use nested subgraphs - keep the structure flat
+   - Ensure all connections are properly defined
+4. FOLLOW THIS FORMAT but with MORE NODES and CONNECTIONS:
+   flowchart TD
+     A["Node A"]
+     B["Node B"]
+     C["Node C"]
+     D["Node D"]
+     E["Node E"]
+     A --> B & C
+     B --> D
+     C --> D & E
+     D --> E
+
+5. Your response MUST be valid Mermaid syntax ONLY
+6. Use only ONE set of brackets for nodes: Node1["Label"]
+7. DO NOT use quotation marks inside node labels
+
+**File Paths to Analyze:**
+${filePaths}
+
+Create a DETAILED yet valid diagram. Focus on comprehensive representation of the system architecture while ensuring syntax correctness.
+`;
+
+  const prompt = detailLevel === 'detailed' ? detailedPrompt : simplePrompt;
+
   try {
     const result = await model.generateContent(prompt);
     let mermaidCode = result.response.text().trim();
 
     // Log raw output for debugging
-    console.log("📊 Raw AI-generated Mermaid Code:\n", mermaidCode);
+    console.log(`📊 Raw AI-generated Mermaid Code (${detailLevel}):\n`, mermaidCode);
 
     // Basic cleanup
     mermaidCode = mermaidCode
@@ -178,7 +220,7 @@ Keep your diagram SIMPLE. It's better to have a basic diagram that works than a 
       .replace(/^\s+/gm, '  ')     // Standardize indentation to 2 spaces
       .trim();
 
-    console.log("📊 Fixed Mermaid Code:\n", mermaidCode);
+    console.log(`📊 Fixed Mermaid Code (${detailLevel}):\n`, mermaidCode);
     
     // Verify syntax before returning (try to catch issues earlier)
     if (mermaidCode.includes('["') && !mermaidCode.includes('"]')) {
