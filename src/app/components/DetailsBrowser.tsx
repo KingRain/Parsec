@@ -8,6 +8,7 @@ import { analyzeWithGemini } from "../utils/analyzeWithGemini";
 import { fetchRepoFiles } from '../utils/fetchRepoFiles';
 
 const WebsiteGraph = dynamic(() => import("./WebsiteGraph"), { ssr: false });
+const ChatBot = dynamic(() => import("./ChatBot"), { ssr: false });
 
 interface DetailsBrowserProps {
   repoOwner: string;
@@ -20,7 +21,7 @@ interface Dependency {
 }
 
 export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserProps) {
-  const [activeTab, setActiveTab] = useState<"codebase" | "graph">("codebase");
+  const [activeTab, setActiveTab] = useState<"codebase" | "graph" | "chat">("codebase");
   const [dependencies, setDependencies] = useState<Dependency[]>([]);
   const [graphData, setGraphData] = useState<string>("graph TD;");
   const [loading, setLoading] = useState(false);
@@ -93,10 +94,10 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
   return (
     <div className="w-full h-full bg-black text-white border-slate-700 border-l p-2">
       <div className="flex border-b border-gray-800">
-        {["codebase", "graph"].map((tab) => (
+        {["codebase", "graph", "chat"].map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab as "codebase" | "graph")}
+            onClick={() => setActiveTab(tab as "codebase" | "graph" | "chat")}
             className={cn(
               "px-4 py-2 text-sm font-medium transition-colors",
               activeTab === tab
@@ -104,7 +105,7 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
                 : "text-gray-400 hover:text-gray-200"
             )}
           >
-            {tab === "codebase" ? "Codebase Info" : "Graph"}
+            {tab === "codebase" ? "Codebase Info" : tab === "graph" ? "Graph" : "Chat"}
           </button>
         ))}
       </div>
@@ -133,8 +134,10 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
               </ul>
             )}
           </>
-        ) : (
+        ) : activeTab === "graph" ? (
           <WebsiteGraph graphData={graphData} repoOwner={repoOwner} repoName={repoName} />
+        ) : (
+          <ChatBot ownerName={repoOwner} repoName={repoName}/>
         )}
       </div>
     </div>
