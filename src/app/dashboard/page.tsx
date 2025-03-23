@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import FileViewer from "../components/FileViewer";
 import { MagicCard } from "@/components/magicui/magic-card";
+import { BorderBeam } from "@/components/magicui/border-beam";
+import { HyperText } from "@/components/magicui/hyper-text";
 
 interface Repository {
     id: number;
@@ -43,7 +45,7 @@ export default function Dashboard() {
 
     return (
         <main className="p-4">
-            <h1 className="text-2xl font-bold mb-6">Your Repositories</h1>
+            <HyperText className="text-2xl font-bold mb-6">Your Repositories</HyperText>
             
             {loading ? (
                 <p>Loading...</p>
@@ -66,13 +68,13 @@ export default function Dashboard() {
             ) : (
                 <div>
                     <div className="max-w-xl mx-auto mb-8">
-                        <div className="relative">
+                        <div className="relative overflow-hidden rounded-lg">
                             <input
                                 type="text"
                                 placeholder="Search repositories..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors duration-200"
+                                className="w-full px-4 py-2 rounded-lg outline-none bg-white/5"
                             />
                             <svg
                                 className="absolute right-3 top-2.5 h-5 w-5 text-gray-400"
@@ -87,6 +89,12 @@ export default function Dashboard() {
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                                 />
                             </svg>
+                            <BorderBeam 
+                                duration={20} 
+                                borderWidth={1.2} 
+                                colorFrom="#9E7AFF" 
+                                colorTo="#FE8BBB" 
+                            />
                         </div>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
