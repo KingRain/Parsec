@@ -25,6 +25,8 @@ export default function WebsiteGraph({
   setIsLoading,
 }: WebsiteGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const zoomInRef = useRef<((value?: number) => void) | null>(null);
+  
   // Use external loading state if provided, otherwise use internal state
   const [internalLoading, setInternalLoading] = useState(false);
   const loading = isLoading !== undefined ? isLoading : internalLoading;
@@ -230,6 +232,98 @@ export default function WebsiteGraph({
   }, [files, repoOwner, repoName, initialGraphData, isInitialized, viewMode, setLoading]); // Include setLoading in dependencies
   
 
+  // Function to center and adjust the SVG diagram
+  const centerAndAdjustDiagram = (svgElement: SVGElement) => {
+    // Set width and height to 100% to fill container
+    svgElement.setAttribute('width', '100%');
+    svgElement.setAttribute('height', '100%');
+    
+    // Ensure the viewBox is correctly set for proper scaling
+    if (!svgElement.getAttribute('viewBox')) {
+      try {
+        const bbox = (svgElement as SVGGraphicsElement).getBBox();
+        // Add padding around the diagram content
+        const padding = Math.max(bbox.width, bbox.height) * 0.1; // 10% padding
+        svgElement.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + 2*padding} ${bbox.height + 2*padding}`);
+      } catch (err) {
+        console.error("Error getting bounding box:", err);
+      }
+    }
+    
+    // Add preserveAspectRatio attribute to center content
+    svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    
+    // Find all nodes in the diagram to ensure they're visible
+    const nodeElements = svgElement.querySelectorAll('.node, rect, circle, ellipse');
+    
+    // If we find nodes, ensure at least some are visible by adjusting scale
+    if (nodeElements.length > 0) {
+      // Set minimum node size for visibility
+      const minNodeSize = 50; // minimum size in pixels for a node to be clearly visible
+      
+      // Check if nodes are too small and need rescaling
+      let needsRescale = false;
+      const smallestNode = { width: Infinity, height: Infinity };
+      
+      nodeElements.forEach(node => {
+        try {
+          // Try to get node dimensions
+          const nodeBBox = (node as SVGGraphicsElement).getBBox();
+          if (nodeBBox.width < smallestNode.width) smallestNode.width = nodeBBox.width;
+          if (nodeBBox.height < smallestNode.height) smallestNode.height = nodeBBox.height;
+          
+          // If any node is too small, we'll need to rescale
+          if (nodeBBox.width < minNodeSize || nodeBBox.height < minNodeSize) {
+            needsRescale = true;
+          }
+        } catch {
+          // Ignore errors for elements that don't support getBBox
+        }
+      });
+      
+      // If we need rescaling and have valid smallest node dimensions
+      if (needsRescale && smallestNode.width < Infinity && smallestNode.height < Infinity) {
+        // Calculate ideal scale factors
+        const scaleX = minNodeSize / smallestNode.width;
+        const scaleY = minNodeSize / smallestNode.height;
+        
+        // Use the smaller scale to ensure everything fits
+        const scale = Math.min(scaleX, scaleY);
+        
+        // Add a custom attribute that our zoom controls can use
+        svgElement.setAttribute('data-initial-scale', scale.toString());
+      }
+    }
+    
+    // Fix any fixed positions that might cause diagram to render off-screen
+    const gElements = svgElement.querySelectorAll('g[transform]');
+    gElements.forEach(g => {
+      const transform = g.getAttribute('transform');
+      if (transform && transform.includes('translate') && !g.classList.contains('adjusted')) {
+        const translateRegex = /translate\(([-\d.]+),\s*([-\d.]+)\)/;
+        const match = transform.match(translateRegex);
+        
+        if (match) {
+          const [, x, y] = match;
+          const parsedX = parseFloat(x);
+          const parsedY = parseFloat(y);
+          
+          // If Y is very negative (diagram is too high), adjust it
+          if (parsedY < -500) {
+            const newTransform = transform.replace(
+              translateRegex,
+              `translate(${parsedX}, ${Math.max(parsedY, -300)})`
+            );
+            g.setAttribute('transform', newTransform);
+            g.classList.add('adjusted');
+          }
+        }
+      }
+    });
+    
+    return true;
+  };
+
   useEffect(() => {
     if (processedGraph && containerRef.current) {
       const id = `mermaid-${Date.now()}`;
@@ -241,6 +335,21 @@ export default function WebsiteGraph({
           if (containerRef.current) {
             containerRef.current.innerHTML = ""; // Clear previous content
             containerRef.current.innerHTML = svg; // Insert new graph
+            
+            // Apply transformations to center the diagram
+            const svgElement = containerRef.current.querySelector('svg');
+            if (svgElement) {
+              // Apply centering and get whether we need initial zooming
+              centerAndAdjustDiagram(svgElement as SVGElement);
+              
+              // Apply initial scale if needed
+              const initialScale = svgElement.getAttribute('data-initial-scale');
+              if (initialScale) {
+                const scale = parseFloat(initialScale);
+                // Store scale value for later use with the reset button
+                (containerRef.current as HTMLDivElement & { initialScale?: number }).initialScale = scale;
+              }
+            }
           }
         })
         .catch((err) => {
@@ -460,62 +569,135 @@ export default function WebsiteGraph({
       </div>
       
       <TransformWrapper
-        initialScale={2}
-        minScale={0.5}
+        initialScale={1}
+        minScale={0.2}
         maxScale={20}
         centerOnInit={true}
+        limitToBounds={false}
+        initialPositionX={0}
+        initialPositionY={0}
         wheel={{
           step: 0.2,
+          smoothStep: 0.04,
+          wheelDisabled: false,
         }}
         pinch={{
           step: 5,
+          disabled: false,
         }}
         doubleClick={{
           mode: 'reset',
         }}
+        panning={{
+          disabled: false,
+          velocityDisabled: false,
+        }}
+        onInit={() => {
+          // After component is initialized, check if we need to apply initial scaling
+          setTimeout(() => {
+            if (containerRef.current) {
+              const initialScale = (containerRef.current as HTMLDivElement & { initialScale?: number }).initialScale;
+              if (initialScale && initialScale > 1 && zoomInRef.current) {
+                zoomInRef.current(initialScale - 1);
+              }
+            }
+          }, 300);
+        }}
       >
-        {({ zoomIn, zoomOut, resetTransform }) => (
-          <>
-            <div className="absolute bottom-4 left-4 z-10 flex gap-2 bg-gray-900/70 p-1.5 rounded-md backdrop-blur-sm">
-              <button 
-                onClick={() => zoomIn(0.5)} 
-                className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
-                title="Zoom in"
+        {({ zoomIn, zoomOut, resetTransform }) => {
+          // Store the zoomIn function in a ref for later use
+          zoomInRef.current = zoomIn;
+          
+          return (
+            <>
+              <div className="absolute bottom-4 left-4 z-10 flex gap-2 bg-gray-900/70 p-1.5 rounded-md backdrop-blur-sm">
+                <button 
+                  onClick={() => zoomIn(0.5)} 
+                  className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
+                  title="Zoom in"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </button>
+                <button 
+                  onClick={() => zoomOut(0.5)} 
+                  className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
+                  title="Zoom out"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+                  </svg>
+                </button>
+                <button 
+                  onClick={() => resetTransform()} 
+                  className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
+                  title="Reset view"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                  </svg>
+                </button>
+                <button 
+                  onClick={() => {
+                    // Auto-center and fit the diagram
+                    if (containerRef.current) {
+                      const svgElement = containerRef.current.querySelector('svg');
+                      if (svgElement) {
+                        // Re-apply diagram adjustments
+                        centerAndAdjustDiagram(svgElement as SVGElement);
+                        
+                        // Apply initial scale if it exists, otherwise reset to default
+                        const initialScale = (containerRef.current as HTMLDivElement & { initialScale?: number }).initialScale || 1;
+                        resetTransform();
+                        
+                        // If we have a stored initial scale > 1, apply it after a short delay
+                        if (initialScale > 1) {
+                          setTimeout(() => {
+                            zoomIn(initialScale - 1);
+                          }, 100);
+                        }
+                      }
+                    }
+                  }} 
+                  className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
+                  title="Fit to view"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+              <TransformComponent 
+                wrapperStyle={{ 
+                  width: "100%", 
+                  height: "100vh",
+                  overflow: "hidden",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  cursor: "grab",
+                }}
+                contentStyle={{ 
+                  width: "100%", 
+                  height: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </button>
-              <button 
-                onClick={() => zoomOut(0.5)} 
-                className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
-                title="Zoom out"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
-                </svg>
-              </button>
-              <button 
-                onClick={() => resetTransform()} 
-                className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
-                title="Reset view"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                </svg>
-              </button>
-            </div>
-            <TransformComponent 
-              wrapperStyle={{ width: "100%", height: "100vh" }}
-              contentStyle={{ width: "100%", height: "100%" }}
-            >
-              <div
-                ref={containerRef}
-                className="w-full h-full bg-black text-white p-4"
-              />
-            </TransformComponent>
-          </>
-        )}
+                <div
+                  ref={containerRef}
+                  className="w-full h-full bg-black text-white p-4 flex justify-center items-center"
+                  style={{ 
+                    minHeight: "80vh",
+                    position: "relative",
+                  }}
+                />
+              </TransformComponent>
+            </>
+          );
+        }}
       </TransformWrapper>
     </div>
   );
