@@ -196,7 +196,7 @@ const Playground = () => {
         drawGridDots(ctx, canvasRef.current.width, canvasRef.current.height);
     };
 
-    const downloadCanvas = (type: 'jpeg' | 'png' | 'svg' ) => {
+    const downloadCanvas = (type: 'jpeg' | 'png' | 'svg') => {
         if (!canvasRef.current) return;
         
         const canvas = canvasRef.current;
@@ -226,7 +226,7 @@ const Playground = () => {
             link.href = url;
             link.click();
             URL.revokeObjectURL(url);
-        } 
+        }
     };
 
     return (
@@ -303,12 +303,6 @@ const Playground = () => {
                             onClick={() => downloadCanvas('svg')}
                         >
                             SVG
-                        </button>
-                        <button 
-                            className="block px-4 py-2 w-full text-left hover:bg-gray-100" 
-                            onClick={() => downloadCanvas('pdf')}
-                        >
-                            PDF
                         </button>
                     </div>
                 </div>
