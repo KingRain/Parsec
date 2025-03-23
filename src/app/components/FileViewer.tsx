@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { getGitHubFetchOptions } from '../utils/githubAuth';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useRouter } from 'next/navigation';
 
 interface FileViewerProps {
     repoOwner: string;
@@ -17,6 +18,7 @@ interface FileItem {
 }
 
 export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
+    const router = useRouter();
     const [currentPath, setCurrentPath] = useState<string[]>([]);
     const [files, setFiles] = useState<FileItem[]>([]);
     const [fileContent, setFileContent] = useState<string>('');
@@ -171,6 +173,19 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
         setFileContent('');
     };
 
+    const handleBackButton = () => {
+        if (currentPath.length > 0) {
+            // We're in a subdirectory, go up one level
+            const newPath = currentPath.slice(0, currentPath.length - 1);
+            setCurrentPath(newPath);
+            fetchDirectoryContents(newPath.join('/'));
+            setFileContent('');
+        } else {
+            // We're at root, go back to dashboard
+            router.back();
+        }
+    };
+
     const generateDiagram = async () => {
         if (!fileContent || generatingDiagram) return;
         
@@ -264,6 +279,18 @@ export default function FileViewer({ repoOwner, repoName }: FileViewerProps) {
     return (
         <div className="flex h-screen bg-black text-gray-100">
             <div className="w-64 border-r border-gray-800 overflow-y-auto bg-black">
+                <div className="flex items-center p-3 border-b border-gray-800">
+                    <button
+                        onClick={() => handleBackButton()}
+                        className="p-1 rounded-full hover:bg-gray-800 transition-colors duration-150 mr-2"
+                        aria-label="Go back"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 hover:text-blue-400">
+                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <span className="font-medium text-blue-400 truncate">{repoOwner}/{repoName}</span>
+                </div>
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="flex justify-center items-center py-4">
