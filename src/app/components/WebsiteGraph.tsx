@@ -25,16 +25,8 @@ export default function WebsiteGraph({
   const [processedGraph, setProcessedGraph] = useState<string>("");
   const [svgContent, setSvgContent] = useState<string>("");
   const [viewMode, setViewMode] = useState<"simple" | "detailed">("simple");
-<<<<<<< HEAD
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-=======
-  
-  // Store both graph versions
-  const [simpleGraph, setSimpleGraph] = useState<string>("");
-  const [detailedGraph, setDetailedGraph] = useState<string>("");
-  const [fetchingGraphs, setFetchingGraphs] = useState(false);
->>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
 
   const fixSpecificSyntaxError = (input: string): string => {
     const lines = input.split("\n");
@@ -92,9 +84,7 @@ export default function WebsiteGraph({
     setIsInitialized(true);
   }, []);
 
-  // Fetch both graph types on initial load
   useEffect(() => {
-<<<<<<< HEAD
     if (isInitialized) {
       const processGraphData = async () => {
         try {
@@ -134,71 +124,20 @@ export default function WebsiteGraph({
             setProcessedGraph(
               "flowchart TD\n    A[Missing Data] --> B[Cannot Generate Graph]"
             );
-=======
-    if (!loading && files && repoOwner && repoName && !initialGraphData) {
-      const fetchBothGraphs = async () => {
-        try {
-          setFetchingGraphs(true);
-          
-          // Fetch both graph types in parallel
-          const [simpleData, detailedData] = await Promise.all([
-            analyzeWithGemini(repoOwner, repoName, files, "simple"),
-            analyzeWithGemini(repoOwner, repoName, files, "detailed")
-          ]);
-          
-          // Process simple graph
-          let fixedSimple = fixSpecificSyntaxError(simpleData);
-          if (!fixedSimple.includes("flowchart") && !fixedSimple.includes("graph")) {
-            fixedSimple = "flowchart TD\n" + fixedSimple;
->>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
           }
-          setSimpleGraph(fixedSimple);
-          
-          // Process detailed graph
-          let fixedDetailed = fixSpecificSyntaxError(detailedData);
-          if (!fixedDetailed.includes("flowchart") && !fixedDetailed.includes("graph")) {
-            fixedDetailed = "flowchart TD\n" + fixedDetailed;
-          }
-          setDetailedGraph(fixedDetailed);
-          
-          // Set current graph based on view mode
-          setProcessedGraph(viewMode === "simple" ? fixedSimple : fixedDetailed);
-          setFetchingGraphs(false);
         } catch (err) {
-          console.error("Error fetching graphs:", err);
-          setProcessedGraph("flowchart TD\n    A[Error] --> B[Failed to Generate]");
-          setFetchingGraphs(false);
+          console.error("Error processing graph:", err);
+          setProcessedGraph(
+            "flowchart TD\n    A[Error] --> B[Failed to Generate]"
+          );
+          setLoading(false); // Ensure loading is turned off on error
         }
       };
-      
-      fetchBothGraphs();
-    } else if (!loading && initialGraphData) {
-      // Handle initialGraphData case
-      let fixed = fixSpecificSyntaxError(initialGraphData);
-      if (!fixed.includes("flowchart") && !fixed.includes("graph")) {
-        fixed = "flowchart TD\n" + fixed;
-      }
-      setSimpleGraph(fixed);
-      setDetailedGraph(fixed);
-      setProcessedGraph(fixed);
-    } else if (!loading) {
-      setProcessedGraph("flowchart TD\n    A[Missing Data] --> B[Cannot Generate Graph]");
+  
+      processGraphData();
     }
-<<<<<<< HEAD
   }, [files, repoOwner, repoName, initialGraphData, isInitialized, viewMode]); // Include viewMode in dependencies
   
-=======
-  }, [files, repoOwner, repoName, initialGraphData, loading]);
-
-  // Handle view mode change
-  useEffect(() => {
-    if (viewMode === "simple" && simpleGraph) {
-      setProcessedGraph(simpleGraph);
-    } else if (viewMode === "detailed" && detailedGraph) {
-      setProcessedGraph(detailedGraph);
-    }
-  }, [viewMode, simpleGraph, detailedGraph]);
->>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
 
   useEffect(() => {
     if (processedGraph && containerRef.current) {
@@ -216,13 +155,11 @@ export default function WebsiteGraph({
         .catch((err) => {
           console.error("Failed to render graph:", err);
           setSvgContent("");
-          if (containerRef.current) {
-            containerRef.current.innerHTML = `
-              <div class="mt-4 p-2 bg-red-900 text-white rounded">
-                <p>Error: ${err.message || "Failed to render diagram"}</p>
-              </div>
-            `;
-          }
+          containerRef.current!.innerHTML = `
+            <div class="mt-4 p-2 bg-red-900 text-white rounded">
+              <p>Error: ${err.message || "Failed to render diagram"}</p>
+            </div>
+          `;
         });
     }
   }, [processedGraph]);
@@ -249,13 +186,7 @@ export default function WebsiteGraph({
     if (!containerRef.current) return;
     
     if (!isFullscreen) {
-      // Get parent element which contains the TransformWrapper
-      const wrapper = containerRef.current.closest('.react-transform-wrapper');
-      if (wrapper && wrapper.requestFullscreen) {
-        wrapper.requestFullscreen().catch(err => {
-          console.error(`Error attempting to enable fullscreen: ${err.message}`);
-        });
-      } else if (containerRef.current.requestFullscreen) {
+      if (containerRef.current.requestFullscreen) {
         containerRef.current.requestFullscreen();
       }
     } else {
@@ -263,6 +194,7 @@ export default function WebsiteGraph({
         document.exitFullscreen();
       }
     }
+    setIsFullscreen(!isFullscreen);
   };
 
   useEffect(() => {
@@ -279,12 +211,11 @@ export default function WebsiteGraph({
   if (loading) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-4">
-        <div className="relative w-16 h-16 mb-4">
-          <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <div className="absolute top-2 left-2 w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin-slow"></div>
-          <div className="absolute top-4 left-4 w-8 h-8 border-4 border-blue-300 border-t-transparent rounded-full animate-spin-slower"></div>
-        </div>
-        <p className="text-lg font-medium">Generating {viewMode} diagram...</p>
+        <svg className="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p className="text-lg">Generating {viewMode} diagram...</p>
         <p className="text-sm text-gray-400 mt-2">This may take a few moments</p>
       </div>
     );
@@ -292,7 +223,6 @@ export default function WebsiteGraph({
 
   return (
     <div className="relative w-full h-full">
-<<<<<<< HEAD
       <div className="absolute top-2 right-2 z-10 flex gap-2 bg-gray-900/70 p-1.5 rounded-md backdrop-blur-sm">
         <div className="flex rounded-md overflow-hidden">
           <button
@@ -371,103 +301,18 @@ export default function WebsiteGraph({
         </div>
       </div>
       
-=======
-      <div className="absolute top-2 right-2 z-10 flex gap-2">
-        <button
-          onClick={() => setViewMode("simple")}
-          disabled={fetchingGraphs}
-          className={`text-white p-1 rounded text-xs shadow-sm ${
-            viewMode === "simple" 
-              ? "bg-blue-700" 
-              : "bg-blue-600 hover:bg-blue-700"
-          } ${fetchingGraphs ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          Simple
-        </button>
-        <button
-          onClick={() => setViewMode("detailed")}
-          disabled={fetchingGraphs}
-          className={`text-white p-1 rounded text-xs shadow-sm ${
-            viewMode === "detailed" 
-              ? "bg-blue-700" 
-              : "bg-blue-600 hover:bg-blue-700"
-          } ${fetchingGraphs ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          Detailed
-        </button>
-        <button
-          onClick={handleDownload}
-          disabled={!svgContent || fetchingGraphs}
-          className="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          ↓ SVG
-        </button>
-      </div>
-      {fetchingGraphs && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-5">
-          <div className="bg-gray-800 p-4 rounded-md shadow-lg">
-            <p className="text-white">Generating graphs...</p>
-          </div>
-        </div>
-      )}
->>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
       <TransformWrapper
         initialScale={2}
         minScale={1}
         maxScale={20}
         centerOnInit={true}
-        wheel={{
-          step: 0.2,
-        }}
-        pinch={{
-          step: 5,
-        }}
-        doubleClick={{
-          mode: 'reset',
-        }}
       >
-        {({ zoomIn, zoomOut, resetTransform }) => (
-          <>
-            <div className="absolute bottom-4 left-4 z-10 flex gap-2 bg-gray-900/70 p-1.5 rounded-md backdrop-blur-sm">
-              <button 
-                onClick={() => zoomIn(0.5)} 
-                className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
-                title="Zoom in"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </button>
-              <button 
-                onClick={() => zoomOut(0.5)} 
-                className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
-                title="Zoom out"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
-                </svg>
-              </button>
-              <button 
-                onClick={() => resetTransform()} 
-                className="flex items-center justify-center w-8 h-8 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
-                title="Reset view"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                </svg>
-              </button>
-            </div>
-            <TransformComponent 
-              wrapperStyle={{ width: "100%", height: "100vh" }}
-              contentStyle={{ width: "100%", height: "100%" }}
-            >
-              <div
-                ref={containerRef}
-                className="w-full h-full bg-black text-white p-4"
-              />
-            </TransformComponent>
-          </>
-        )}
+        <TransformComponent wrapperStyle={{ width: "100%", height: "100vh" }}>
+          <div
+            ref={containerRef}
+            className="w-full h-full bg-black text-white p-4"
+          />
+        </TransformComponent>
       </TransformWrapper>
     </div>
   );
