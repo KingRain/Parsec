@@ -2,6 +2,7 @@
 
 import FileViewer from '@/app/components/FileViewer';
 import DetailsBrowser from '@/app/components/DetailsBrowser';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function ProjectPage() {
@@ -9,6 +10,7 @@ export default function ProjectPage() {
     const router = useRouter();
     const username = params.username as string;
     const projectName = params.projectName as string;
+    const [files, setFiles] = useState([]);
 
     const handleRefresh = () => {
         router.refresh();
@@ -23,13 +25,13 @@ export default function ProjectPage() {
                 {projectName}
             </h1>
             <div className="flex">
-                <div className="w-3/4">
+                <div className="w-3/5">
                     <FileViewer
                         repoOwner={username}
                         repoName={projectName}
                     />
                 </div>
-                <div className="w-1/4">
+                <div className="w-2/5">
                     <DetailsBrowser
                         repoOwner={username}
                         repoName={projectName}
