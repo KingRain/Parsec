@@ -15,6 +15,10 @@ export async function GET(req: NextRequest) {
             headers: {
                 Authorization: `Bearer ${token}`,
                 Accept: 'application/vnd.github.v3+json'
+            },
+            params: {
+                sort: 'updated',
+                per_page: 100
             }
         });
 
