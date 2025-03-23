@@ -577,12 +577,12 @@ export default function WebsiteGraph({
         initialPositionX={0}
         initialPositionY={0}
         wheel={{
-          step: 0.2,
-          smoothStep: 0.04,
+          step: 0.01,          // Reduced from 0.2 for smaller increments
+          smoothStep: 0.02,    // Reduced for smoother zooming
           wheelDisabled: false,
         }}
         pinch={{
-          step: 5,
+          step: 1,             // Reduced from 3 for smaller pinch zoom increments
           disabled: false,
         }}
         doubleClick={{
