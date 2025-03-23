@@ -192,7 +192,7 @@ const Playground = () => {
         drawGridDots(ctx, canvasRef.current.width, canvasRef.current.height);
     };
 
-    const downloadCanvas = (type: 'jpeg' | 'png' | 'svg' | 'pdf') => {
+    const downloadCanvas = (type: 'jpeg' | 'png' | 'svg' ) => {
         if (!canvasRef.current) return;
         
         const canvas = canvasRef.current;
@@ -222,10 +222,7 @@ const Playground = () => {
             link.href = url;
             link.click();
             URL.revokeObjectURL(url);
-        } else if (type === 'pdf') {
-            // Use a library like jsPDF to generate PDF
-            alert('PDF export requires additional library. Consider adding jsPDF for this feature.');
-        }
+        } 
     };
 
     return (
@@ -284,7 +281,7 @@ const Playground = () => {
                     >
                         Download
                     </button>
-                    <div id="downloadOptions" className="absolute hidden mt-1 bg-white border rounded shadow-lg z-10">
+                    <div id="downloadOptions" className="absolute hidden mt-1 bg-white text-black border rounded shadow-lg z-10">
                         <button 
                             className="block px-4 py-2 w-full text-left hover:bg-gray-100" 
                             onClick={() => downloadCanvas('png')}
