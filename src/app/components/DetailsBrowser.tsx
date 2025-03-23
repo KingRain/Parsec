@@ -28,6 +28,7 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState<"simple" | "detailed">("simple");
   const [repoFiles, setRepoFiles] = useState<{path: string}[]>([]);
+  const [diagramLoading, setDiagramLoading] = useState(false);
   
   useEffect(() => {
     const abortController = new AbortController();
@@ -94,6 +95,13 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
     return () => abortController.abort();
   }, [activeTab, repoOwner, repoName]);
   
+  // Function to handle view mode changes with proper loading state
+  const handleViewModeChange = (mode: "simple" | "detailed") => {
+    setDiagramLoading(true);
+    setViewMode(mode);
+  };
+  
+  // Add a separate effect for viewMode changes
   useEffect(() => {
     if (activeTab !== "graph") return;
     
@@ -101,11 +109,11 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
     const { signal } = controller;
     
     const fetchData = async () => {
-      if (!repoFiles.length || loading) {
+      if (!repoFiles.length) {
         return;
       }
       
-      setLoading(true);
+      setDiagramLoading(true);
       try {
         const response = await analyzeWithGemini(
           repoOwner, 
@@ -125,7 +133,7 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
         }
       } finally {
         if (!signal.aborted) {
-          setLoading(false);
+          setDiagramLoading(false);
         }
       }
     };
@@ -134,6 +142,34 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
     
     return () => controller.abort();
   }, [viewMode, repoOwner, repoName, activeTab, repoFiles.length]);
+
+  // Add a separate effect to fetch initial data when switching to graph tab
+  useEffect(() => {
+    if (activeTab === "graph" && repoFiles.length === 0) {
+      const fetchInitialGraphData = async () => {
+        setLoading(true);
+        setError("");
+        
+        try {
+          const files = await fetchRepoFiles(repoOwner, repoName);
+          setRepoFiles(files);
+          const response = await analyzeWithGemini(repoOwner, repoName, files, viewMode);
+          
+          console.log("Raw AI Response:", response);
+          
+          setGraphData(response);
+        } catch (err) {
+          console.error("Error generating graph:", err);
+          setGraphData("graph TD;\n Error[\"Failed to generate graph\"]");
+        } finally {
+          setLoading(false);
+          setDiagramLoading(false); // Also reset diagram loading state
+        }
+      };
+      
+      fetchInitialGraphData();
+    }
+  }, [activeTab, repoOwner, repoName, repoFiles.length, viewMode]);
 
   return (
     <div className="w-full h-full bg-black text-white border-slate-700 border-l p-2">
@@ -184,7 +220,9 @@ export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserPr
             repoOwner={repoOwner} 
             repoName={repoName}
             files={repoFiles} 
-            onViewModeChange={setViewMode}
+            onViewModeChange={handleViewModeChange}
+            isLoading={diagramLoading}
+            setIsLoading={setDiagramLoading}
           />
         ) : (
           <ChatBot ownerName={repoOwner} repoName={repoName}/>
