@@ -2,7 +2,6 @@
 
 import FileViewer from '@/app/components/FileViewer';
 import DetailsBrowser from '@/app/components/DetailsBrowser';
-import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function ProjectPage() {
@@ -10,7 +9,6 @@ export default function ProjectPage() {
     const router = useRouter();
     const username = params.username as string;
     const projectName = params.projectName as string;
-    const [files, setFiles] = useState([]);
 
     const handleRefresh = () => {
         router.refresh();

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
 
 // Initialize the Google AI SDK
 const genAI = new GoogleGenerativeAI("AIzaSyDTlyP33hmBQ_y-LFIdZbWd7MVtm0U93JQ");
@@ -103,7 +103,8 @@ Create a DETAILED yet valid diagram. Focus on comprehensive representation of th
 
   try {
     const result = await model.generateContent(prompt);
-    let mermaidCode = result.response.text().trim();
+    const responseText = result.response.text();
+    let mermaidCode = responseText.trim();
 
     // Log raw output for debugging
     console.log(`📊 Raw AI-generated Mermaid Code (${detailLevel}):\n`, mermaidCode);
@@ -122,7 +123,7 @@ Create a DETAILED yet valid diagram. Focus on comprehensive representation of th
       
       // Extract node information from the complex diagram
       const nodeRegex = /([A-Za-z0-9_]+)\s*\[["']?(.*?)["']?\]/g;
-      const nodes = [];
+      const nodes: Array<{ id: string; label: string }> = [];
       let match;
       
       while ((match = nodeRegex.exec(mermaidCode)) !== null) {
@@ -140,7 +141,7 @@ Create a DETAILED yet valid diagram. Focus on comprehensive representation of th
       
       // Extract connection information
       const connectionRegex = /([A-Za-z0-9_]+)\s*--+>?\s*([A-Za-z0-9_]+)/g;
-      const connections = [];
+      const connections: Array<{ from: string; to: string }> = [];
       
       while ((match = connectionRegex.exec(mermaidCode)) !== null) {
         connections.push({ from: match[1].trim(), to: match[2].trim() });

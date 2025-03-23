@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import ReactMarkdown from "react-markdown";
@@ -11,13 +12,18 @@ interface Message {
   content: string;
 }
 
-export default function ChatBot({ ownerName, repoName }) {
+interface ChatBotProps {
+  ownerName?: string;
+  repoName?: string;
+}
+
+export default function ChatBot({ ownerName, repoName }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [repoInfo, setRepoInfo] = useState({
-    owner: "",
-    repo: "",
+    owner: ownerName || "",
+    repo: repoName || "",
     branch: "main",
   });
   const [showRepoSettings, setShowRepoSettings] = useState(false);
@@ -84,7 +90,7 @@ export default function ChatBot({ ownerName, repoName }) {
       setIsLoading(true);
 
       // Add user message to chat
-      const newMessages = [
+      const newMessages: Message[] = [
         ...messages,
         { role: "user", content: inputMessage },
       ];
@@ -100,7 +106,7 @@ export default function ChatBot({ ownerName, repoName }) {
           if (!fileResult.success) {
             setMessages([
               ...newMessages,
-              { role: "assistant", content: fileResult.error },
+              { role: "assistant", content: fileResult.error || "Unknown error" },
             ]);
             setInputMessage("");
             setIsLoading(false);
@@ -112,7 +118,7 @@ export default function ChatBot({ ownerName, repoName }) {
           const prompt = `I have the following code file named ${filename}. Please analyze it and suggest specific improvements for readability, performance, and best practices. Format your response with specific code suggestions where applicable:\n\n${fileResult.content}`;
 
           const result = await model.generateContent(prompt);
-          const response = await result.response;
+          const response = result.response;
           const text = response.text();
 
           // Add AI response to chat
@@ -153,7 +159,7 @@ export default function ChatBot({ ownerName, repoName }) {
       console.error("Error:", error);
       // Add error message to chat
       setMessages([
-        ...newMessages,
+        ...messages,
         {
           role: "assistant",
           content: "Sorry, I encountered an error processing your request.",
@@ -226,7 +232,7 @@ export default function ChatBot({ ownerName, repoName }) {
             </div>
           </div>
           <p className="mt-2 text-xs text-gray-400">
-            To improve a file, type: "improve filename.js" in the chat
+            To improve a file, type: &quot;improve filename.js&quot; in the chat
           </p>
         </div>
       )}
@@ -237,7 +243,7 @@ export default function ChatBot({ ownerName, repoName }) {
             <div className="text-center text-white mt-8">
               <p>Start a conversation with Gemini AI</p>
               <p className="text-sm mt-2">
-                Tip: Type "improve filename.js" to get improvement suggestions
+                Tip: Type &quot;improve filename.js&quot; to get improvement suggestions
                 for your code files
               </p>
             </div>
