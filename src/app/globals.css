@@ -40,3 +40,24 @@ body {
   --card-background: #1f2937;
   --card-border: #374151;
 }
+
+/* Custom animations for graph loading spinner */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-slower {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+.animate-spin-slower {
+  animation: spin-slower 5s linear infinite;
+}
