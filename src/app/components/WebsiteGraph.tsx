@@ -25,13 +25,16 @@ export default function WebsiteGraph({
   const [processedGraph, setProcessedGraph] = useState<string>("");
   const [svgContent, setSvgContent] = useState<string>("");
   const [viewMode, setViewMode] = useState<"simple" | "detailed">("simple");
+<<<<<<< HEAD
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+=======
   
-  // Store both graph versions to avoid regenerating when switching views
+  // Store both graph versions
   const [simpleGraph, setSimpleGraph] = useState<string>("");
   const [detailedGraph, setDetailedGraph] = useState<string>("");
   const [fetchingGraphs, setFetchingGraphs] = useState(false);
+>>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
 
   const fixSpecificSyntaxError = (input: string): string => {
     const lines = input.split("\n");
@@ -91,11 +94,51 @@ export default function WebsiteGraph({
 
   // Fetch both graph types on initial load
   useEffect(() => {
-    if (isInitialized && files && files.length > 0 && repoOwner && repoName && !initialGraphData) {
+<<<<<<< HEAD
+    if (isInitialized) {
+      const processGraphData = async () => {
+        try {
+          if (initialGraphData) {
+            setLoading(true);
+            let fixed = fixSpecificSyntaxError(initialGraphData);
+  
+            if (!fixed.includes("flowchart") && !fixed.includes("graph")) {
+              fixed = "flowchart TD\n" + fixed;
+            }
+  
+            console.log("Original:", initialGraphData);
+            console.log("Fixed:", fixed);
+  
+            setProcessedGraph(fixed); // Always update to trigger re-render
+            setLoading(false);
+          } else if (files && files.length > 0 && repoOwner && repoName) {
+            setLoading(true); // Show loading state while fetching new data
+            const graphData = await analyzeWithGemini(
+              repoOwner,
+              repoName,
+              files,
+              viewMode
+            );
+            let fixed = fixSpecificSyntaxError(graphData);
+  
+            if (!fixed.includes("flowchart") && !fixed.includes("graph")) {
+              fixed = "flowchart TD\n" + fixed;
+            }
+  
+            console.log("Original:", graphData);
+            console.log("Fixed:", fixed);
+  
+            setProcessedGraph(fixed); // Always update to trigger re-render
+            setLoading(false); // Hide loading when complete
+          } else {
+            setProcessedGraph(
+              "flowchart TD\n    A[Missing Data] --> B[Cannot Generate Graph]"
+            );
+=======
+    if (!loading && files && repoOwner && repoName && !initialGraphData) {
       const fetchBothGraphs = async () => {
         try {
           setFetchingGraphs(true);
-          setLoading(true);
           
           // Fetch both graph types in parallel
           const [simpleData, detailedData] = await Promise.all([
@@ -107,6 +150,7 @@ export default function WebsiteGraph({
           let fixedSimple = fixSpecificSyntaxError(simpleData);
           if (!fixedSimple.includes("flowchart") && !fixedSimple.includes("graph")) {
             fixedSimple = "flowchart TD\n" + fixedSimple;
+>>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
           }
           setSimpleGraph(fixedSimple);
           
@@ -120,19 +164,16 @@ export default function WebsiteGraph({
           // Set current graph based on view mode
           setProcessedGraph(viewMode === "simple" ? fixedSimple : fixedDetailed);
           setFetchingGraphs(false);
-          setLoading(false);
         } catch (err) {
           console.error("Error fetching graphs:", err);
           setProcessedGraph("flowchart TD\n    A[Error] --> B[Failed to Generate]");
           setFetchingGraphs(false);
-          setLoading(false);
         }
       };
       
       fetchBothGraphs();
-    } else if (isInitialized && initialGraphData) {
+    } else if (!loading && initialGraphData) {
       // Handle initialGraphData case
-      setLoading(true);
       let fixed = fixSpecificSyntaxError(initialGraphData);
       if (!fixed.includes("flowchart") && !fixed.includes("graph")) {
         fixed = "flowchart TD\n" + fixed;
@@ -140,11 +181,14 @@ export default function WebsiteGraph({
       setSimpleGraph(fixed);
       setDetailedGraph(fixed);
       setProcessedGraph(fixed);
-      setLoading(false);
-    } else if (isInitialized) {
+    } else if (!loading) {
       setProcessedGraph("flowchart TD\n    A[Missing Data] --> B[Cannot Generate Graph]");
     }
-  }, [files, repoOwner, repoName, initialGraphData, isInitialized]);
+<<<<<<< HEAD
+  }, [files, repoOwner, repoName, initialGraphData, isInitialized, viewMode]); // Include viewMode in dependencies
+  
+=======
+  }, [files, repoOwner, repoName, initialGraphData, loading]);
 
   // Handle view mode change
   useEffect(() => {
@@ -154,6 +198,7 @@ export default function WebsiteGraph({
       setProcessedGraph(detailedGraph);
     }
   }, [viewMode, simpleGraph, detailedGraph]);
+>>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
 
   useEffect(() => {
     if (processedGraph && containerRef.current) {
@@ -186,10 +231,19 @@ export default function WebsiteGraph({
   const changeViewMode = (mode: "simple" | "detailed") => {
     // Only trigger reload if the mode is different
     if (mode !== viewMode) {
+      // Don't set loading here since we want that to be controlled by the parent
       setViewMode(mode);
       onViewModeChange?.(mode);
     }
   };
+
+  useEffect(() => {
+    // Reset loading state when the viewMode changes
+    // This will help sync with the parent's loading state
+    if (loading && !files?.length) {
+      setLoading(false);
+    }
+  }, [viewMode, loading, files]);
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -222,7 +276,7 @@ export default function WebsiteGraph({
     };
   }, []);
 
-  if (loading || fetchingGraphs) {
+  if (loading) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-4">
         <div className="relative w-16 h-16 mb-4">
@@ -238,6 +292,7 @@ export default function WebsiteGraph({
 
   return (
     <div className="relative w-full h-full">
+<<<<<<< HEAD
       <div className="absolute top-2 right-2 z-10 flex gap-2 bg-gray-900/70 p-1.5 rounded-md backdrop-blur-sm">
         <div className="flex rounded-md overflow-hidden">
           <button
@@ -247,7 +302,7 @@ export default function WebsiteGraph({
                 ? "bg-blue-600 text-white" 
                 : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
-            disabled={fetchingGraphs}
+            disabled={loading}
             title="Simple view"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -262,7 +317,7 @@ export default function WebsiteGraph({
                 ? "bg-blue-600 text-white" 
                 : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
-            disabled={fetchingGraphs}
+            disabled={loading}
             title="Detailed view"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -271,6 +326,18 @@ export default function WebsiteGraph({
             Detailed
           </button>
         </div>
+        
+        {loading && (
+          <div
+            className="px-2 py-1 bg-gray-700 text-gray-300 rounded-md flex items-center text-xs"
+          >
+            <svg className="animate-spin h-3 w-3 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Processing
+          </div>
+        )}
         
         <div className="flex gap-2">
           <button
@@ -304,6 +371,46 @@ export default function WebsiteGraph({
         </div>
       </div>
       
+=======
+      <div className="absolute top-2 right-2 z-10 flex gap-2">
+        <button
+          onClick={() => setViewMode("simple")}
+          disabled={fetchingGraphs}
+          className={`text-white p-1 rounded text-xs shadow-sm ${
+            viewMode === "simple" 
+              ? "bg-blue-700" 
+              : "bg-blue-600 hover:bg-blue-700"
+          } ${fetchingGraphs ? "opacity-50 cursor-not-allowed" : ""}`}
+        >
+          Simple
+        </button>
+        <button
+          onClick={() => setViewMode("detailed")}
+          disabled={fetchingGraphs}
+          className={`text-white p-1 rounded text-xs shadow-sm ${
+            viewMode === "detailed" 
+              ? "bg-blue-700" 
+              : "bg-blue-600 hover:bg-blue-700"
+          } ${fetchingGraphs ? "opacity-50 cursor-not-allowed" : ""}`}
+        >
+          Detailed
+        </button>
+        <button
+          onClick={handleDownload}
+          disabled={!svgContent || fetchingGraphs}
+          className="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          ↓ SVG
+        </button>
+      </div>
+      {fetchingGraphs && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-5">
+          <div className="bg-gray-800 p-4 rounded-md shadow-lg">
+            <p className="text-white">Generating graphs...</p>
+          </div>
+        </div>
+      )}
+>>>>>>> 129bb2be9442a92edcfa4193e5b9b58e58a62a6e
       <TransformWrapper
         initialScale={2}
         minScale={1}
