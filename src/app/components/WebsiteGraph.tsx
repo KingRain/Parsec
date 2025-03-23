@@ -151,6 +151,22 @@ export default function WebsiteGraph({
     if (processedGraph && containerRef.current) {
       const id = `mermaid-${Date.now()}`;
 
+      // Show a smaller loading indicator inside the diagram area instead of replacing entire view
+      if (containerRef.current && loading) {
+        containerRef.current.innerHTML = `
+          <div class="w-full h-full flex items-center justify-center">
+            <div class="flex flex-col items-center">
+              <div class="relative w-12 h-12 mb-3">
+                <div class="absolute top-0 left-0 w-full h-full border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <div class="absolute top-1.5 left-1.5 w-9 h-9 border-3 border-blue-400 border-t-transparent rounded-full animate-spin-slow"></div>
+                <div class="absolute top-3 left-3 w-6 h-6 border-3 border-blue-300 border-t-transparent rounded-full animate-spin-slower"></div>
+              </div>
+              <p class="text-sm font-medium">Rendering ${viewMode} diagram...</p>
+            </div>
+          </div>
+        `;
+      }
+
       mermaid
         .render(id, processedGraph)
         .then(({ svg }) => {
@@ -170,7 +186,7 @@ export default function WebsiteGraph({
           `;
         });
     }
-  }, [processedGraph]);
+  }, [processedGraph, loading, viewMode]);
 
   // Add this function to handle view mode changes
   const changeViewMode = (mode: "simple" | "detailed") => {
@@ -223,7 +239,7 @@ export default function WebsiteGraph({
     };
   }, []);
 
-  if (loading) {
+  if (loading && !processedGraph) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-4">
         <div className="relative w-16 h-16 mb-4">
