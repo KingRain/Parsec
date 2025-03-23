@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import LanguageStats from "./LanguageStats";
-import WebsiteGraph from "./WebsiteGraph";
+import dynamic from "next/dynamic";
+import { analyzeWithGemini } from "../utils/analyzeWithGemini";
+import { fetchRepoFiles } from '../utils/fetchRepoFiles';
+
+const WebsiteGraph = dynamic(() => import("./WebsiteGraph"), { ssr: false });
 
 interface DetailsBrowserProps {
   repoOwner: string;
@@ -15,56 +19,41 @@ interface Dependency {
   version: string;
 }
 
-export default function DetailsBrowser({
-  repoOwner,
-  repoName,
-}: DetailsBrowserProps) {
+export default function DetailsBrowser({ repoOwner, repoName }: DetailsBrowserProps) {
   const [activeTab, setActiveTab] = useState<"codebase" | "graph">("codebase");
   const [dependencies, setDependencies] = useState<Dependency[]>([]);
+  const [graphData, setGraphData] = useState<string>("graph TD;");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  
   useEffect(() => {
-    async function fetchPackageJson() {
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
+    async function fetchDependencies() {
       setLoading(true);
       setError("");
+
       try {
-        // Fetch package.json content from GitHub API
         const response = await fetch(
-          `https://api.github.com/repos/${repoOwner}/${repoName}/contents/package.json`
+          `https://api.github.com/repos/${repoOwner}/${repoName}/contents/package.json`,
+          { signal }
         );
 
-        if (!response.ok) {
-          throw new Error("Could not fetch package.json");
-        }
+        if (!response.ok) throw new Error("Could not fetch package.json");
 
         const data = await response.json();
-
-        // GitHub API returns the content as base64 encoded
         const content = atob(data.content);
         const packageJson = JSON.parse(content);
 
-        // Extract dependencies and devDependencies
-        const deps: Dependency[] = [];
-
-        if (packageJson.dependencies) {
-          Object.entries(packageJson.dependencies).forEach(
-            ([name, version]) => {
-              deps.push({ name, version: version as string });
-            }
-          );
-        }
-
-        if (packageJson.devDependencies) {
-          Object.entries(packageJson.devDependencies).forEach(
-            ([name, version]) => {
-              deps.push({ name, version: `${version as string} (dev)` });
-            }
-          );
-        }
+        const deps: Dependency[] = [
+          ...Object.entries(packageJson.dependencies || {}).map(([name, version]) => ({ name, version: version as string })),
+          ...Object.entries(packageJson.devDependencies || {}).map(([name, version]) => ({ name, version: `${version as string} (dev)` })),
+        ];
 
         setDependencies(deps);
       } catch (err) {
+        if (signal.aborted) return;
         setError("Failed to load dependencies");
         console.error(err);
       } finally {
@@ -72,107 +61,81 @@ export default function DetailsBrowser({
       }
     }
 
-    if (activeTab === "codebase") {
-      fetchPackageJson();
+    async function fetchGraphData() {
+      setLoading(true);
+      setError("");
+      
+      try {
+        const files = await fetchRepoFiles(repoOwner, repoName);
+        const response = await analyzeWithGemini(repoOwner, repoName, files);
+        
+        console.log("Raw AI Response:", response);
+        
+        setGraphData(response);
+      } catch (err) {
+        if (signal.aborted) return;
+        console.error("Error generating graph:", err);
+        setGraphData("graph TD;\n Error[\"Failed to generate graph\"]");
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [repoOwner, repoName, activeTab]);
+
+    if (activeTab === "codebase") {
+      fetchDependencies();
+    } else if (activeTab === "graph") {
+      fetchGraphData();
+    }
+
+    return () => abortController.abort();
+  }, [activeTab, repoOwner, repoName]);
 
   return (
     <div className="w-full h-full bg-black text-white border-slate-700 border-l p-2">
-      {/* Tab Navigation */}
       <div className="flex border-b border-gray-800">
-        <button
-          onClick={() => setActiveTab("codebase")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "codebase"
-              ? "text-blue-400 border-b border-blue-400"
-              : "text-gray-400 hover:text-gray-200"
-          )}
-        >
-          Codebase Info
-        </button>
-
-        <button
-          onClick={() => setActiveTab("graph")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "graph"
-              ? "text-blue-400 border-b border-blue-400"
-              : "text-gray-400 hover:text-gray-200"
-          )}
-        >
-          Graph
-        </button>
+        {["codebase", "graph"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab as "codebase" | "graph")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium transition-colors",
+              activeTab === tab
+                ? "text-blue-400 border-b border-blue-400"
+                : "text-gray-400 hover:text-gray-200"
+            )}
+          >
+            {tab === "codebase" ? "Codebase Info" : "Graph"}
+          </button>
+        ))}
       </div>
 
-      {/* Content Area */}
-      <div className="w-full h-[calc(100%-40px)]">
-        <div
-          className={cn(
-            "w-full h-full",
-            activeTab === "codebase" ? "block" : "hidden"
-          )}
-        >
-          {/* Codebase Info Content */}
-          <div className="w-full flex flex-col gap-1 p-1">
-            <div className="border border-gray-800 rounded p-1">
-              <h3 className="text-sm font-medium mb-1">Languages</h3>
-              <LanguageStats repoOwner={repoOwner} repoName={repoName} />
-            </div>
-            <div className="border border-gray-800 rounded p-1">
-              <h3 className="text-sm font-medium mb-1">Dependencies</h3>
-              <div className="flex flex-col gap-1">
-                {loading && (
-                  <div className="text-sm text-gray-400">
-                    Loading dependencies...
-                  </div>
-                )}
-                {error && <div className="text-sm text-red-400">{error}</div>}
-                {!loading && !error && dependencies.length === 0 && (
-                  <div className="text-sm text-gray-400">
-                    No dependencies found
-                  </div>
-                )}
-                {dependencies.map((dep, index) => (
-                  <div key={index} className="flex items-center gap-1">
-                    <div className="h-2 w-2 rounded-full bg-blue-400"></div>
-                    <span className="text-sm">
-                      <a
-                        href={`https://www.npmjs.com/package/${dep.name}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline"
-                      >
-                        {dep.name}
-                      </a>{" "}
-                      <span className="text-xs text-gray-400">
-                        {dep.version}
-                      </span>
-                      {dep.deprecated && (
-                        <span className="ml-1 text-xs bg-red-900 text-red-300 px-1 py-0.5 rounded">
-                          deprecated
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="w-full h-[calc(100%-40px)] p-2">
+        {activeTab === "codebase" ? (
+          <>
+            <h3 className="text-sm font-medium mb-2">Languages</h3>
+            <LanguageStats repoOwner={repoOwner} repoName={repoName} />
 
-        <div
-          className={cn(
-            "w-full h-full",
-            activeTab === "graph" ? "block" : "hidden"
-          )}
-        >
-          {/* Graph Content */}
-          <div className="w-full h-full">
-            <WebsiteGraph repoOwner={repoOwner} repoName={repoName}/>
-          </div>
-        </div>
+            <h3 className="text-sm font-medium mt-4 mb-2">Dependencies</h3>
+            {loading ? (
+              <p className="text-gray-400">Loading dependencies...</p>
+            ) : error ? (
+              <p className="text-red-400">{error}</p>
+            ) : dependencies.length === 0 ? (
+              <p className="text-gray-400">No dependencies found</p>
+            ) : (
+              <ul className="text-sm">
+                {dependencies.map((dep, index) => (
+                  <li key={index} className="flex gap-2">
+                    <span className="text-blue-400">{dep.name}</span>
+                    <span className="text-gray-400">{dep.version}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <WebsiteGraph graphData={graphData} repoOwner={repoOwner} repoName={repoName} />
+        )}
       </div>
     </div>
   );
