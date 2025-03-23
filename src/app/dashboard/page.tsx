@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import FileViewer from "../components/FileViewer";
+import { MagicCard } from "@/components/magicui/magic-card";
 
 interface Repository {
     id: number;
@@ -88,13 +89,20 @@ export default function Dashboard() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {filteredRepos.map((repo) => (
-                            <div
-                                key={repo.id}
-                                onClick={() => handleRepoClick(repo)}
-                                className="p-4 border rounded-lg cursor-pointer hover:border-blue-500 hover:shadow-md transition-all"
-                            >
-                                <h3 className="font-semibold text-lg">{repo.name}</h3>
-                                <p className="text-sm text-gray-600">{repo.owner.login}</p>
+                            <div key={repo.id} onClick={() => handleRepoClick(repo)} className="rounded-lg border border-white/20">
+                                <MagicCard 
+                                    gradientSize={150}
+                                    gradientColor="#262626" 
+                                    gradientFrom="#9E7AFF"
+                                    gradientTo="#FE8BBB"
+                                    gradientOpacity={0.8}
+                                    className="h-full p-4 cursor-pointer"
+                                >
+                                    <div className="p-4">
+                                        <h3 className="font-semibold text-lg">{repo.name}</h3>
+                                        <p className="text-sm text-gray-600">{repo.owner.login}</p>
+                                    </div>
+                                </MagicCard>
                             </div>
                         ))}
                     </div>
