@@ -9,12 +9,18 @@ import { fetchRepoFiles } from '../utils/fetchRepoFiles';
 
 const WebsiteGraph = dynamic(() => import("./WebsiteGraph"), { ssr: false });
 const ChatBot = dynamic(() => import("./ChatBot"), { ssr: false });
-const Playground = dynamic(() => import("./Playground"), { ssr: false });
 
 interface DetailsBrowserProps {
   repoOwner: string;
   repoName: string;
 }
+
+interface PlaygroundProps {
+  repoOwner: string;
+  repoName: string;
+}
+
+const Playground = dynamic<PlaygroundProps>(() => import("./Playground"), { ssr: false });
 
 interface Dependency {
   name: string;
