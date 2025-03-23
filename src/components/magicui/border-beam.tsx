@@ -24,7 +24,7 @@ export function BorderBeam({
 }: BorderBeamProps) {
   const [progress, setProgress] = useState(initialOffset);
   const containerRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
   
   useEffect(() => {
     let startTime: number;
